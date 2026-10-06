@@ -245,6 +245,8 @@ button,input,select,textarea{font-family:inherit}
 .kk-bd-body{font-size:14px;line-height:1.75;white-space:pre-wrap;word-break:break-word}
 .kk-bd-act{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:14px}
 .kk-bd-act .sd-big{flex:1 1 100%}
+.kk-del{background:var(--rd);color:#FFFFFF;border:1px solid var(--rd);font-family:inherit;font-size:12px;font-weight:700;padding:5px 10px;line-height:1.2;cursor:pointer;white-space:nowrap;flex:0 0 auto}
+.kk-del-lg{display:block;margin:10px auto 0;font-size:13.5px;padding:10px 18px}
 .kk-links{display:flex;justify-content:center;align-items:center;gap:10px;font-size:13px;color:var(--mu)}
 .kk-links a,.kk-linkbtn{color:var(--pr);font-weight:600;text-decoration:underline;text-underline-offset:4px;background:none;border:none;padding:4px 0;cursor:pointer;font-size:13px;font-family:inherit}
 .kk-sub{font-size:14px;font-weight:700;color:var(--tx);margin:2px 2px -2px}
@@ -1222,8 +1224,6 @@ function rSignup(){
     '<div style="font-size:11.5px;color:var(--mu);margin:-2px 2px 0;line-height:1.55;">아이디·비밀번호를 찾을 때 써요. 이메일 1개로 아이디 1개만 만들 수 있어요</div>'+
     lab('기존 멤버라면 예전 닉네임',0)+'<input class="ainp" type="text" id="su-oldnick" placeholder="예) 강둥맘 (처음이면 비워두세요)" value="'+esc(f.old||'')+'">'+
     '<div style="font-size:11.5px;color:var(--mu);margin:-2px 2px 0;line-height:1.55;">적어 주시면 강둥맘이 예전 계정과 연결해 드려요. 인증 기록은 그대로 남아요</div>'+
-    lab('참여하고 싶은 스터디 (선택)',0)+kkWantPick()+
-    '<div style="font-size:11.5px;color:var(--mu);margin:-2px 2px 0;line-height:1.55;">강둥맘이 가입을 승인하면서 스터디를 배정해 드려요</div>'+
     (S.suErr?'<p class="err">'+esc(S.suErr)+'</p>':'')+
     '<button class="abtn full" id="su-submit">가입 신청</button>'+
     '<button class="abtn sec full" id="su-back">로그인 화면으로</button>'+
@@ -1281,7 +1281,7 @@ function rRoutineStudy(s, m, showLeave){
   h+='<span style="flex:1;font-size:14px;font-weight:700;cursor:pointer;" data-expci="'+s.id+'">'+esc(s.name)+'</span>';
   if(diaCnt)h+='<span title="누적 다이아 '+diaCnt+'개 (매달 50% 이상 인증 시 1개씩 적립)">💎×'+diaCnt+'</span>';
   h+='<span style="font-size:11px;color:var(--mu);">'+doneCnt+'/7일</span>';
-  if(showLeave)h+='<button data-cancel-apply="'+s.id+'" title="스터디 탈퇴" style="border:none;background:none;cursor:pointer;font-size:14px;padding:2px;line-height:1;">🚫</button>';
+  if(showLeave)h+='<button class="kk-del" data-cancel-apply="'+s.id+'" title="내 목록에서 삭제">삭제</button>';
   h+='<span style="font-size:12px;color:var(--mu);cursor:pointer;" data-expci="'+s.id+'">'+(isExpCI?'▲':'▼')+'</span>';
   h+='</div>';
 
@@ -1620,13 +1620,13 @@ function rCI(){
         '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'+
           '<span style="font-size:14px;font-weight:700;">'+esc(s.name)+'</span>'+
           (kkStartLbl(s)?'<span style="font-size:11px;font-weight:700;color:#fff;background:var(--pr);padding:3px 9px;border-radius:0;white-space:nowrap;">📅 '+kkStartLbl(s)+'</span>':'')+
+          (function(){var o=kkOverdue(m).filter(function(x){return x.sid===s.id;})[0];return o?'<span class="kk-ovchip">⏰ 밀린 '+o.weeks.length+'주</span>':'';})()+
           (function(){var b=getStudyBadge(s,m);return b?'<span style="font-size:11px;font-weight:700;color:'+b.color+';background:'+b.bg+';padding:3px 10px;border-radius:0;border:1.5px solid '+b.border+';">'+b.badge+' '+b.label+'</span>':'';})()+
         '</div>'+
         '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">'+
-          (function(){var o=kkOverdue(m).filter(function(x){return x.sid===s.id;})[0];return o?'<span class="kk-ovchip">⏰ 밀린 '+o.weeks.length+'주</span>':'';})()+
           '<span style="font-size:11px;color:var(--mu);">'+ss.dn+'/'+ss.t+'주</span>'+
           '<span style="font-size:12px;font-weight:700;color:'+(ss.pct===100?'var(--gr)':'var(--pr)')+';">'+ss.pct+'%</span>'+
-          '<button data-cancel-apply="'+s.id+'" title="스터디 탈퇴" style="border:none;background:none;cursor:pointer;font-size:14px;padding:2px;line-height:1;">🚫</button>'+
+          '<button class="kk-del" data-cancel-apply="'+s.id+'" title="내 목록에서 삭제">삭제</button>'+
           '<span style="font-size:16px;color:var(--mu);font-weight:700;">›</span>'+
         '</div></div>';
       if(isExpCI){
@@ -1882,7 +1882,7 @@ function rStudyDetail(s,m){
           h+='</div>';
         }
   h+='</div>';
-  h+='<button class="sd-leave" data-cancel-apply="'+s.id+'">🚫 이 스터디 탈퇴하기</button>';
+  h+='<button class="kk-del kk-del-lg" data-cancel-apply="'+s.id+'">이 스터디 목록에서 삭제</button><div class="kk-hint" style="text-align:center;margin:6px 0 0">삭제해도 지금까지의 인증 기록은 그대로 남아요</div>';
   if(S.saving)h+='<div style="text-align:center;font-size:13px;color:var(--mu);">저장 중...</div>';
   return h+'</div>';
 }
@@ -3425,7 +3425,7 @@ function rST(){
         h+='<div class="pend-card"><div style="display:flex;align-items:center;gap:8px;"><b style="font-size:14px;flex:1;">'+esc(su.momName||su.name)+'</b>'+
           '<span style="font-size:11px;color:var(--mu);">'+(d.getMonth()+1)+'/'+d.getDate()+' 신청</span></div>'+
           '<div style="font-size:12px;margin-top:3px;line-height:1.6;">🆔 '+esc(su.loginId||'')+(su.emailMask?'<br>📧 '+esc(su.emailMask):'')+(su.oldNick?'<br>🔗 <b>기존 멤버</b> · 예전 닉네임: '+esc(su.oldNick):'')+((su.wantIds||[]).length?'<br>📚 희망 스터디: <b>'+esc(S.studies.filter(function(s){return su.wantIds.indexOf(s.id)>=0;}).map(function(s){return s.name;}).join(', '))+'</b>':'')+'<br>📷 '+(su.insta?'<a href="https://instagram.com/'+encodeURIComponent(su.insta)+'" target="_blank" style="color:var(--bld);">@'+esc(su.insta)+'</a> (눌러서 확인)':'미입력')+'</div>'+
-          '<div style="margin-top:8px;padding:.5rem .6rem;background:var(--wh);border:1px solid var(--br);"><div style="font-size:12.5px;font-weight:700;margin-bottom:6px;">🔗 기존 멤버라면 예전 계정과 연결</div>'+'<div style="display:flex;gap:6px;"><select id="kklk-'+su.id+'" style="min-height:40px;font-size:13px;">'+kkLinkOptions(su)+'</select><button class="abtn sm" data-kklink="'+su.id+'">연결</button></div>'+'<div class="kk-hint" style="margin-top:5px;">연결하면 인증 기록·등급은 그대로, 아이디·비밀번호만 새것으로 바뀌어요. 새 멤버면 아래 등급 버튼으로 승인하세요.</div></div>'+'<details'+((su.wantIds||[]).length?' open':'')+' style="margin-top:8px;background:var(--wh);border:1px solid #FDE68A;border-radius:0;padding:.4rem .6rem;"><summary style="font-size:12.5px;font-weight:700;cursor:pointer;">📚 스터디 배정'+((su.wantIds||[]).length?' (희망 스터디 체크됨)':' (선택)')+'</summary>'+kkPickWith('pa-'+su.id,su.wantIds)+'</details>'+
+          '<div style="margin-top:8px;padding:.5rem .6rem;background:var(--wh);border:1px solid var(--br);"><div style="font-size:12.5px;font-weight:700;margin-bottom:6px;">🔗 기존 멤버라면 예전 계정과 연결</div>'+'<div style="display:flex;gap:6px;"><select id="kklk-'+su.id+'" style="min-height:40px;font-size:13px;">'+kkLinkOptions(su)+'</select><button class="abtn sm" data-kklink="'+su.id+'">연결</button></div>'+'<div class="kk-hint" style="margin-top:5px;">연결하면 인증 기록·등급은 그대로, 아이디·비밀번호만 새것으로 바뀌어요. 새 멤버면 아래 등급 버튼으로 승인하세요.</div></div>'+'<details style="margin-top:8px;background:var(--wh);border:1px solid #FDE68A;border-radius:0;padding:.4rem .6rem;"><summary style="font-size:12.5px;font-weight:700;cursor:pointer;">📚 스터디 배정'+((su.wantIds||[]).length?' (희망 스터디 체크됨)':' (선택)')+'</summary>'+kkPickWith('pa-'+su.id,su.wantIds)+'</details>'+
           '<div class="pend-btns">'+TIERS.map(function(t){return '<button data-approve="'+su.id+'__'+t.id+'" style="color:'+t.color+';border-color:'+t.color+';background:'+t.bg+';">'+t.ic+' '+t.label+' 승인</button>';}).join('')+
           '<button data-reject="'+su.id+'" style="color:var(--rd);border-color:#FECACA;">거절</button></div></div>';
       });
@@ -3443,8 +3443,7 @@ function rST(){
         '</div>'+
         '<input type="text" id="nm-id" class="ainp" placeholder="로그인 아이디 (비우면 이름과 같게)" autocapitalize="off">'+
         '<select id="nm-tier">'+TIERS.map(function(t){return '<option value="'+t.id+'">'+t.ic+' '+t.label+' 멤버</option>';}).join('')+'</select>'+
-        '<div id="nm-study-section">'+
-          '<div style="font-size:11px;color:var(--mu);margin-bottom:6px;">스터디 배정 (선택)</div>';
+        '<details id="nm-study-section"><summary style="font-size:12.5px;font-weight:700;cursor:pointer;padding:4px 0;">📚 스터디 배정 (선택)</summary>';
     var nmAct=S.studies.filter(function(s){return s.active&&!isStudyEnded(s);});
     var nmCats=[];
     (S.catOrder.length?S.catOrder:nmAct.map(function(s){return s.cat;})).forEach(function(c){if(nmCats.indexOf(c)<0&&nmAct.some(function(s){return s.cat===c;}))nmCats.push(c);});
@@ -3461,7 +3460,7 @@ function rST(){
       });
       h+='</div></div>';
     });
-    h+='</div>'+
+    h+='</details>'+
         '<button class="abtn full" id="am">+ 멤버 추가</button>'+
       '</div></div>'+
     '<div class="stack">';
@@ -4042,10 +4041,10 @@ function bAll(){
     var m=curLoggedMember();if(!m)return;
     var sid=el.dataset.cancelApply;
     var s=S.studies.filter(function(x){return x.id===sid;})[0];
-    if(!confirm((s?s.name:'스터디')+'\n탈퇴(신청취소) 할까요?'))return;
+    if(!confirm('「'+(s?s.name:'스터디')+'」를 내 목록에서 삭제할까요?\n\n· 내 인증 목록에서만 사라져요\n· 지금까지의 인증 기록은 그대로 남아요\n· 다시 신청해서 배정되면 기록이 이어져요'))return;
     m.studyIds=(m.studyIds||[]).filter(function(x){return x!==sid;});
     var ix=S.members.findIndex(function(x){return x.id===m.id;});if(ix>=0)S.members[ix]=m;persist();
-    showToast('🚫 '+(s?esc(s.name):'스터디')+'  탈퇴했어요.','cancel');
+    showToast((s?esc(s.name):'스터디')+' 삭제했어요 · 인증 기록은 남아 있어요','cancel');
     render();
   });});
   // 설정 서브탭
@@ -4359,8 +4358,7 @@ function bAll(){
   on('su-submit',async function(){
     var v=function(id){var e=g(id);return e?e.value:'';};
     var lid=idNorm(v('su-id')),pw=v('su-pw'),pw2=v('su-pw2'),mom=v('su-mom').trim(),insta=v('su-insta').trim().replace(/^@/,''),em=kkEm(v('su-email')),old=v('su-oldnick').trim();
-    var want=[];document.querySelectorAll('.su-want:checked').forEach(function(cb){want.push(cb.value);});
-    S.suForm={lid:lid,mom:mom,insta:insta,em:em,old:old,want:want};
+    S.suForm={lid:lid,mom:mom,insta:insta,em:em,old:old};
     if(!/^[a-z0-9._]{4,20}$/.test(lid)){S.suErr='아이디는 영문 소문자·숫자(._ 가능) 4~20자로 만들어주세요';render();return;}
     if(idTaken(lid)){S.suErr='이미 사용 중인 아이디예요. 다른 아이디를 써주세요';render();return;}
     if(pw.length<4){S.suErr='비밀번호를 4자 이상 입력해주세요';render();return;}
@@ -4371,7 +4369,6 @@ function bAll(){
     var emT=kkEmailTaken(em);if(emT){S.suErr=emT;render();return;}
     var id=uid(),rec={id:id,loginId:lid,momName:mom,insta:insta,name:dispName(mom,insta),createdAt:Date.now(),emailH:kkEmailH(em),emailMask:kkEmailMask(em)};
     if(old)rec.oldNick=old;
-    if(want.length)rec.wantIds=want;
     try{rec.pwh=await hashPw(id,pw);}catch(e){S.suErr='이 브라우저에서는 가입이 어려워요. 다른 브라우저로 열어주세요.';render();return;}
     var o={};o[id]=rec;
     try{await fbPatchPath('signups',o);}catch(e){S.suErr='신청 저장에 실패했어요. 인터넷 연결을 확인해주세요';render();return;}
