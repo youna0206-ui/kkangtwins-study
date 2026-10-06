@@ -218,6 +218,33 @@ button,input,select,textarea{font-family:inherit}
 .kk-want-cat{font-size:11.5px;font-weight:700;color:var(--pr);margin:6px 0 2px}
 .kk-want-it{display:flex;align-items:center;gap:8px;font-size:13.5px;padding:5px 0;cursor:pointer}
 .kk-want-it input{width:17px;height:17px;accent-color:var(--pr);margin:0;flex:0 0 auto}
+.kk-bd-head{padding:2px 2px 14px;border-bottom:2px solid var(--tx)}
+.kk-bd-cat{font-size:12px;font-weight:600;color:var(--pr)}
+.kk-bd-title{font-size:21px;font-weight:700;letter-spacing:-0.03em;margin:4px 0 6px;line-height:1.35}
+.kk-bd-meta{font-size:12.5px;color:var(--mu);line-height:1.6}
+.kk-bd-my{display:flex;align-items:center;gap:10px;margin-top:12px;font-size:13px;white-space:nowrap}
+.kk-bd-bar{flex:1;height:6px;background:var(--prl)}.kk-bd-bar i{display:block;height:100%;background:var(--pr)}
+.kk-bd-info{margin-top:12px;padding:12px 14px;background:var(--prl);font-size:13.5px;font-weight:600}
+.kk-bd-cnt{font-size:13px;color:var(--mu);margin:16px 2px 6px}.kk-bd-cnt b{color:var(--pr)}
+.kk-bd-list{border-top:1px solid var(--tx)}
+.kk-bd-th,.kk-bd-row{display:grid;grid-template-columns:44px minmax(0,1fr) 62px;align-items:center;column-gap:6px}
+.kk-bd-th{font-size:12px;color:var(--mu);padding:8px 0;background:#F7F9F8;border-bottom:1px solid var(--br);text-align:center}
+.kk-bd-row{padding:12px 0;border-bottom:1px solid var(--br);cursor:pointer;font-size:14px;background:#FFFFFF}
+.kk-bd-row.notice{background:#F7FAF8}.kk-bd-row.cur{background:#FFFBF2}.kk-bd-row.on .kk-bd-tt{color:var(--pr);font-weight:700}
+.kk-bd-no{text-align:center;font-size:12.5px;color:var(--mu)}
+.kk-bd-tag{display:inline-block;font-size:11px;font-weight:700;color:var(--rd);border:1px solid var(--rd);padding:0 4px;line-height:1.5}
+.kk-bd-t{min-width:0;display:flex;align-items:center;color:var(--tx)}
+.kk-bd-tt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kk-bd-new,.kk-bd-file{flex:0 0 auto}
+.kk-bd-new{font-size:10.5px;font-weight:700;color:#FFFFFF;background:var(--or);padding:1px 5px;margin-left:6px;vertical-align:1px}
+.kk-bd-file{font-size:10.5px;font-weight:600;color:var(--pr);border:1px solid var(--pr);padding:0 4px;margin-left:5px;vertical-align:1px}
+.kk-bd-st{text-align:center;font-size:12px;font-weight:600}
+.kk-bd-post{padding:16px 14px 18px;border-bottom:1px solid var(--br);background:#FFFFFF;box-shadow:inset 3px 0 0 var(--pr)}
+.kk-bd-pt{font-size:16.5px;font-weight:700;line-height:1.45;letter-spacing:-0.02em}
+.kk-bd-pm{font-size:12px;color:var(--mu);padding:4px 0 10px;border-bottom:1px solid var(--br);margin-bottom:12px}
+.kk-bd-body{font-size:14px;line-height:1.75;white-space:pre-wrap;word-break:break-word}
+.kk-bd-act{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:14px}
+.kk-bd-act .sd-big{flex:1 1 100%}
 .kk-links{display:flex;justify-content:center;align-items:center;gap:10px;font-size:13px;color:var(--mu)}
 .kk-links a,.kk-linkbtn{color:var(--pr);font-weight:600;text-decoration:underline;text-underline-offset:4px;background:none;border:none;padding:4px 0;cursor:pointer;font-size:13px;font-family:inherit}
 .kk-sub{font-size:14px;font-weight:700;color:var(--tx);margin:2px 2px -2px}
@@ -888,6 +915,8 @@ document.addEventListener('click',function(e){
   if(kq('#kf-back')){e.stopPropagation();S.tab='mlogin';render();window.scrollTo(0,0);return;}
   if(kq('#kf-findid')){e.stopPropagation();kkFindId();return;}
   if(kq('#kf-reset')){e.stopPropagation();kkResetReq();return;}
+  var kp=kq('[data-kkpost]');if(kp){e.stopPropagation();var pk=kp.getAttribute('data-kkpost');S.kkPost=S.kkPost||{};var cur=kp.classList.contains('on');S.kkPost[pk]=!cur;render();return;}
+  if(kq('#kkmg-go')){e.stopPropagation();kkMergeAccounts();return;}
   var kl=kq('[data-kklink]');if(kl){e.stopPropagation();kkLinkSignup(kl.getAttribute('data-kklink'));return;}
   var ks=kq('[data-kkrs]');if(ks){e.stopPropagation();kkSetTempPw(ks.getAttribute('data-kkrs'));return;}
   var kd=kq('[data-kkrsdel]');if(kd){e.stopPropagation();kkDelReset(kd.getAttribute('data-kkrsdel'));return;}
@@ -951,7 +980,7 @@ function rApp(){
       nb('more',IC.gr,'더보기',moreTabs.indexOf(S.tab)>=0,ia?pendingCount():0)+
       '</div></nav>';
   } else S._bnav='';
-  var pages={ci:rCI,mp:rMP,apply:rApply,notice:rNotice,cal:rCal,cp:rCP,overall:kkTierWrap(rOV,'ms'),report:kkTierWrap(rRP,'ms'),settings:kkTierWrap(rST,function(){var t=S.settingsTab||'study';return t==='member'?'m':t==='study'?'s':t==='studymem'?'ms':'';}),mlogin:rML,kkfind:kkFind,alogin:rAL,more:rMore,signup:rSignup};
+  var pages={ci:rCI,mp:rMP,apply:rApply,notice:rNotice,cal:rCal,cp:rCP,overall:kkTierWrap(rOV,'ms'),report:kkTierWrap(rRP,'ms'),settings:kkTierWrap(rST,function(){var t=S.settingsTab||'study';return (t==='member'||t==='oldmem')?'m':t==='study'?'s':t==='studymem'?'ms':'';}),mlogin:rML,kkfind:kkFind,alogin:rAL,more:rMore,signup:rSignup};
   if(S.impersonating)h+='<div style="display:flex;align-items:center;gap:8px;background:#1E293B;color:#fff;border-radius:0;padding:.6rem .9rem;margin-bottom:10px;font-size:13px;"><span style="flex:1;">👀 <b>'+esc(shortName(S.loggedMember))+'</b> 계정으로 보는 중</span><button id="imp-exit" style="border:none;background:#fff;color:#1E293B;font-weight:800;font-size:12px;border-radius:0;padding:5px 11px;cursor:pointer;">관리자로 돌아가기</button></div>';
   var pageContent=(needsProfile(S.loggedMember)&&S.tab!=='more')?rProfile():(pages[S.tab]||rML)();
   if(im&&!ia&&!S.impersonating&&S.loggedMember&&!S.loggedMember.emailH&&!needsProfile(S.loggedMember)&&S.tab==='ci')pageContent=kkRelinkBanner()+pageContent;
@@ -1080,6 +1109,77 @@ function kkWantPick(){var act=S.studies.filter(function(s){return s.active&&s.ca
   return '<div class="kk-want">'+cats.map(function(c){return '<div class="kk-want-cat">'+esc(c)+'</div>'+sortStudiesByName(act.filter(function(s){return s.cat===c;})).map(function(s){
     return '<label class="kk-want-it"><input type="checkbox" class="su-want" value="'+s.id+'"'+(sel.indexOf(s.id)>=0?' checked':'')+'><span>'+esc(s.name)+'</span></label>';}).join('');}).join('')+'</div>';}
 function kkPickWith(cls,ids){var h=studyPickHtml(cls);(ids||[]).forEach(function(id){h=h.split('class="'+cls+'" value="'+id+'"').join('class="'+cls+'" value="'+id+'" checked');});return h;}
+
+function kkStartLbl(s){var a=[];if(s.startDate){var p=s.startDate.split('-');a.push((+p[1])+'/'+(+p[2])+' 시작');}if(s.dayOfWeek)a.push('매주 '+s.dayOfWeek+'요일');return a.join(' · ');}
+function kkMergeHtml(){
+  var nw=S.members.filter(function(m){return m.emailH&&!m.linkedAt;}),old=S.members.filter(function(m){return !m.emailH;});
+  if(!nw.length||!old.length)return '';
+  var srt=function(a){return a.slice().sort(function(x,y){try{return x.name.localeCompare(y.name,'ko');}catch(e){return 0;}});};
+  var ck=function(id){var n=0,t='__'+id;Object.keys(S.checkins||{}).forEach(function(k){if(k.slice(-t.length)===t)n++;});return n;};
+  var o=function(m){return '<option value="'+m.id+'">'+esc(m.name)+' ('+esc(memLoginId(m))+') · 스터디 '+(m.studyIds||[]).length+' · 인증 '+ck(m.id)+'</option>';};
+  return '<details class="pend-card" style="background:#FFFFFF;border-color:var(--br);margin-bottom:6px;"><summary style="font-size:13px;font-weight:700;cursor:pointer;">🔗 승인된 새 계정을 예전 계정과 합치기</summary>'+
+    '<div class="kk-hint" style="margin:8px 0 6px;">연결 없이 승인돼서 예전 기록이 안 보이는 멤버를 예전 계정과 합쳐요.</div>'+
+    '<div style="font-size:12px;font-weight:700;margin:6px 0 3px;">① 새 계정 (지금 로그인하는 계정)</div><select id="kkmg-new" style="min-height:40px;font-size:13px;"><option value="">선택…</option>'+srt(nw).map(o).join('')+'</select>'+
+    '<div style="font-size:12px;font-weight:700;margin:8px 0 3px;">② 예전 계정 (가져온 기록이 있는 계정)</div><select id="kkmg-old" style="min-height:40px;font-size:13px;"><option value="">선택…</option>'+srt(old).map(o).join('')+'</select>'+
+    '<button class="abtn full" id="kkmg-go" style="margin-top:10px;">합치기</button>'+
+    '<div class="kk-hint" style="margin-top:6px;">아이디·비밀번호·이메일은 새 계정 것을 쓰고, 예전 인증 기록·메달·스터디가 그대로 따라와요. 새 계정에서 한 인증과 스터디도 합쳐져요.</div></details>';
+}
+async function kkMergeAccounts(){
+  var nid=(g('kkmg-new')||{}).value,oid=(g('kkmg-old')||{}).value;
+  if(!nid||!oid){alert('새 계정과 예전 계정을 모두 골라 주세요');return;}
+  var n=S.members.filter(function(x){return x.id===nid;})[0],t=S.members.filter(function(x){return x.id===oid;})[0];
+  if(!n||!t||n===t)return;
+  if(!confirm('「'+n.name+' ('+memLoginId(n)+')」을\n예전 계정「'+t.name+' ('+memLoginId(t)+')」과 합칠까요?\n\n· 로그인은 지금처럼 '+memLoginId(n)+' 아이디·비밀번호로 해요\n· 예전 인증 기록·메달은 그대로 남아요\n· 두 계정의 스터디·인증이 하나로 합쳐져요'))return;
+  var rank={'new':0,'vip':1,'clover':2};
+  t.loginId=n.loginId;t.pwh=n.pwh;t.pwSalt=n.pwSalt||n.id;delete t.pw;
+  if(n.pwTemp)t.pwTemp=true;else delete t.pwTemp;
+  t.emailH=n.emailH;t.emailMask=n.emailMask;t.momName=n.momName||t.momName;t.insta=n.insta||t.insta||'';t.name=n.name||t.name;t.linkedAt=Date.now();
+  if((rank[n.tier]||0)>(rank[t.tier]||0))t.tier=n.tier;
+  t.studyIds=t.studyIds||[];(n.studyIds||[]).forEach(function(x){if(t.studyIds.indexOf(x)<0)t.studyIds.push(x);});
+  var tail='__'+n.id,patch={};
+  Object.keys(S.checkins||{}).forEach(function(k){if(k.slice(-tail.length)!==tail)return;
+    var nk=k.slice(0,-tail.length)+'__'+t.id;
+    if(S.checkins[nk]===undefined){S.checkins[nk]=S.checkins[k];patch[nk]=S.checkins[k];}
+    delete S.checkins[k];patch[k]=null;});
+  S.members=S.members.filter(function(x){return x.id!==n.id;});
+  S.members.sort(function(a,b){try{return a.name.localeCompare(b.name,'ko');}catch(e){return 0;}});
+  await persist();
+  if(Object.keys(patch).length){try{await fbPatchCheckins(patch);}catch(e){alert('인증 기록 옮기기 저장 실패. 인터넷 연결을 확인해 주세요.');}}
+  showToast('🔗 '+t.name+'님 계정 합치기 완료','success');render();
+}
+
+function kkBoardHtml(s,m,aw,ss,curWk,ended,b){
+  var h='<div class="kk-bd-head"><div class="kk-bd-cat">'+esc(s.cat||'')+' 게시판</div><div class="kk-bd-title">'+esc(s.name)+'</div>'+
+    '<div class="kk-bd-meta">'+[kkStartLbl(s),ended?'시즌 종료':(curWk>0?'지금 '+curWk+'주차':''),'전체 '+ss.t+'주'].filter(Boolean).join(' · ')+(b?' · '+b.badge+' '+esc(b.label):'')+'</div>'+
+    '<div class="kk-bd-my"><span>내 인증 <b>'+ss.dn+'</b>/'+ss.t+'주'+(ss.vc?' · 휴가 '+ss.vc:'')+'</span><div class="kk-bd-bar"><i style="width:'+ss.pct+'%"></i></div><b style="color:var(--pr)">'+ss.pct+'%</b></div></div>';
+  if(!ended&&s.startDate&&curWk===0)h+='<div class="kk-bd-info">'+(+s.startDate.split('-')[1])+'/'+(+s.startDate.split('-')[2])+'에 시작해요</div>';
+  if(ended)h+='<div class="kk-bd-info">'+(ss.pct===100?'모든 주차를 완주했어요. 수고 많으셨어요!':'시즌이 끝났어요. 수고 많으셨어요!')+'</div>';
+  var P=S.kkPost||(S.kkPost={});
+  var rows=aw.slice().sort(function(a,c){return c.num-a.num;});
+  h+='<div class="kk-bd-cnt">전체글 <b>'+(rows.length+((s.snotices||[]).length))+'</b></div><div class="kk-bd-list"><div class="kk-bd-th"><span>번호</span><span>제목</span><span>인증</span></div>';
+  (s.snotices||[]).forEach(function(sn){
+    var k='n__'+sn.id,o=P[k]===true;
+    h+='<div class="kk-bd-row notice'+(o?' on':'')+'" data-kkpost="'+k+'"><span class="kk-bd-no"><span class="kk-bd-tag">공지</span></span><span class="kk-bd-t"><b class="kk-bd-tt">'+esc(sn.title)+'</b></span><span class="kk-bd-st"></span></div>';
+    if(o)h+='<div class="kk-bd-post"><div class="kk-bd-pt">'+esc(sn.title)+'</div><div class="kk-bd-pm">강둥맘 · 공지</div><div class="kk-bd-body">'+esc(sn.body||'')+'</div></div>';
+  });
+  rows.forEach(function(w){
+    var fi=sdWkInfo(s,w,m),k=s.id+'__'+w.num,o=P[k]!==undefined?P[k]:fi.isCur;
+    var st=fi.status==='done'?'<span style="color:var(--gr)">✓ 완료</span>':fi.status==='vacation'?'<span style="color:var(--bl)">휴가</span>':
+      fi.isFuture?'<span style="color:var(--mu)">예정</span>':fi.isCur?'<span style="color:var(--rd)">인증하기</span>':(curWk>0&&w.num<curWk&&!w.locked)?'<span style="color:var(--rd)">미인증</span>':'<span style="color:var(--mu)">-</span>';
+    var t=fi.title?esc(fi.title):'<span style="color:var(--mu)">'+w.num+'주차 활동</span>';
+    h+='<div class="kk-bd-row'+(fi.isCur?' cur':'')+(o?' on':'')+'" data-kkpost="'+k+'"><span class="kk-bd-no">'+w.num+'</span>'+
+      '<span class="kk-bd-t"><span class="kk-bd-tt">'+t+'</span>'+(fi.isCur?'<span class="kk-bd-new">이번주</span>':'')+(fi.matUnlocked?'<span class="kk-bd-file">자료</span>':'')+'</span><span class="kk-bd-st">'+st+'</span></div>';
+    if(o){
+      var body=(w.note&&w.note.trim())?w.note.trim().split('\n').slice(1).join('\n').trim():'';
+      h+='<div class="kk-bd-post"><div class="kk-bd-pt">['+w.num+'주차] '+(fi.title?esc(fi.title):'활동 안내')+'</div><div class="kk-bd-pm">강둥맘'+(fi.isCur?' · 이번주':'')+'</div>'+
+        (body?'<div class="kk-bd-body">'+esc(body)+'</div>':(fi.title?'':'<div class="kk-bd-body" style="color:var(--mu)">이번 주 안내가 아직 없어요.</div>'))+
+        '<div class="kk-bd-act">'+sdActHtml(s,w,m,fi,!!fi.isCur)+sdMatHtml(w,fi)+'</div></div>';
+    }
+  });
+  if(!rows.length)h+='<div class="kk-bd-row" style="cursor:default"><span></span><span style="color:var(--mu)">아직 글이 없어요</span><span></span></div>';
+  return h+'</div>';
+}
+function kkIsNewMem(m){return !!m.emailH||(typeof KK_ADMIN_LOGINS!=='undefined'&&KK_ADMIN_LOGINS.indexOf(idNorm(memLoginId(m)))>=0);}
 function rML(){
   return '<div class="login-wrap"><div class="login-box"><h2>👋 로그인</h2>'+
     '<p>아이디와 비밀번호를 입력해주세요</p>'+
@@ -1513,8 +1613,7 @@ function rCI(){
       h+='<div style="display:flex;align-items:center;justify-content:space-between;padding:.875rem 1rem;cursor:pointer;" data-opensd="'+s.id+'">'+
         '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'+
           '<span style="font-size:14px;font-weight:700;">'+esc(s.name)+'</span>'+
-          (s.dayOfWeek?'<span style="font-size:11px;font-weight:700;color:#fff;background:var(--pr);padding:3px 9px;border-radius:0;">📅 '+esc(s.dayOfWeek)+'요일 시작</span>':'')+
-          (s.startDate?'<span style="font-size:11px;font-weight:600;color:var(--pr);background:var(--prl);padding:3px 9px;border-radius:0;">📆 '+(+s.startDate.split('-')[1])+'/'+(+s.startDate.split('-')[2])+' 시작</span>':'')+
+          (kkStartLbl(s)?'<span style="font-size:11px;font-weight:700;color:#fff;background:var(--pr);padding:3px 9px;border-radius:0;white-space:nowrap;">📅 '+kkStartLbl(s)+'</span>':'')+
           (function(){var b=getStudyBadge(s,m);return b?'<span style="font-size:11px;font-weight:700;color:'+b.color+';background:'+b.bg+';padding:3px 10px;border-radius:0;border:1.5px solid '+b.border+';">'+b.badge+' '+b.label+'</span>':'';})()+
         '</div>'+
         '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">'+
@@ -1690,10 +1789,11 @@ function rStudyDetail(s,m){
   var b=getStudyBadge(s,m);
   var h='<div class="sd-top"><button class="sd-back" data-sdback="1">‹</button><div class="sd-top-title">'+esc(s.name)+'</div></div>';
   h+='<div class="stack">';
+  h+='<div>'+kkBoardHtml(s,m,aw,ss,curWk,ended,b)+'</div>';
+  if(false){
   // ① 요약 카드
   h+='<div class="sd-hero"><div class="sd-cat">'+esc(s.cat||'')+'</div><div class="sd-name">'+esc(s.name)+'</div><div class="sd-chips">'+
-    (s.dayOfWeek?'<span class="sd-chip">📅 '+esc(s.dayOfWeek)+'요일 시작</span>':'')+
-    (s.startDate?'<span class="sd-chip">📆 '+(+s.startDate.split('-')[1])+'/'+(+s.startDate.split('-')[2])+' 시작</span>':'')+
+    (kkStartLbl(s)?'<span class="sd-chip" style="white-space:nowrap;">📅 '+kkStartLbl(s)+'</span>':'')+
     (curWk>0&&!ended?'<span class="sd-chip" style="background:#FEF3C7;color:#D97706;">⭐ 지금 '+curWk+'주차</span>':'')+
     (b?'<span class="sd-chip" style="color:'+b.color+';background:'+b.bg+';">'+b.badge+' '+b.label+'</span>':'')+
     '</div><div class="sd-prog"><div style="font-size:12px;color:var(--mu);line-height:1.6;">인증 <b style="color:var(--gr);">'+ss.dn+'</b> · 휴가 <b style="color:var(--bl);">'+ss.vc+'</b> / 전체 '+ss.t+'주</div>'+
@@ -1743,6 +1843,7 @@ function rStudyDetail(s,m){
       '<div class="sd-ract">'+sdActHtml(s,w,m,fi,false)+sdMatHtml(w,fi)+'</div>'+sdNoteHtml(s,w,'')+'</div>';
   });
   h+='</div></div>';
+  }
   // ⑤ 카드 체크리스트
   h+='<div>';
         if(s.cardDecks&&s.cardDecks.length){
@@ -2139,7 +2240,7 @@ function rMP(){
           '<span class="wbdg">'+ss.dn+'/'+ss.t+'주 '+ss.pct+'%</span>'+
           (function(){var b=getStudyBadge(s,m);return b?'<span style="font-size:11px;font-weight:700;color:'+b.color+';background:'+b.bg+';padding:2px 8px;border-radius:0;border:1px solid '+b.border+';">'+b.badge+' '+b.label+'</span>':'';})()+'\n        </div>'+
         '<div style="font-size:11px;color:var(--mu);margin-bottom:5px;">'+
-          (s.dayOfWeek?esc(s.dayOfWeek)+'요일 시작 · ':'')+
+          (kkStartLbl(s)?kkStartLbl(s)+' · ':'')+
           '총 '+ss.t+'주 · 🏖️'+ss.vc+'주'+
         '</div>'+
         '<div class="pb"><div class="pb-f" style="width:'+ss.pct+'%;"></div></div>'+
@@ -3009,7 +3110,7 @@ function rST(){
   var cats=S.catOrder.filter(function(c){return allStudyCats.indexOf(c)>=0;});
   allStudyCats.forEach(function(c){if(cats.indexOf(c)<0)cats.push(c);});
   if(cats.indexOf('루틴 체크')<0)cats.unshift('루틴 체크');
-  var subtabs=[['study','📚 스터디 관리'],['member','👥 멤버관리'+(pendingCount()?' 🔴'+pendingCount():'')],['import','📦 데이터 가져오기']];
+  var subtabs=[['study','📚 스터디 관리'],['member','👥 멤버관리'+(pendingCount()?' 🔴'+pendingCount():'')],['oldmem','🗂️ 과거 멤버'],['import','📦 데이터 가져오기']];
   var h='<div class="stack" style="gap:12px;"><div style="display:flex;gap:5px;overflow-x:auto;scrollbar-width:none;">';
   subtabs.forEach(function(t){h+='<button class="stab-btn'+(S.settingsTab===t[0]?' on':'')+'" data-stab="'+t[0]+'">'+t[1]+'</button>';});
   h+='</div>';
@@ -3306,9 +3407,11 @@ function rST(){
     });
   }
 
-  if(S.settingsTab==='member'){
-    h+=kkAdminExtraHtml();
-    var pend=Object.values(S.signups||{}).sort(function(a,b){return a.createdAt-b.createdAt;});
+  if(S.settingsTab==='member'||S.settingsTab==='oldmem'){
+    var kkOld=S.settingsTab==='oldmem',kkML=S.members.filter(function(m){return kkOld?!kkIsNewMem(m):kkIsNewMem(m);});
+    if(kkOld)h+='<div class="kk-hint" style="margin:0 2px">예전 VIP·NEW 사이트에서 가져온 뒤 아직 다시 가입·연결되지 않은 멤버예요. 다시 가입해서 연결되면 멤버관리로 옮겨가요.</div>';
+    else h+='<div class="kk-hint" style="margin:0 2px">새로 가입해서 승인된 멤버만 보여요. 가져온 기존 멤버는 🗂️ 과거 멤버 탭에 있어요.</div>'+kkAdminExtraHtml()+kkMergeHtml();
+    var pend=kkOld?[]:Object.values(S.signups||{}).sort(function(a,b){return a.createdAt-b.createdAt;});
     if(pend.length){
       h+='<div style="font-size:13px;font-weight:800;color:#B45309;">🙋 가입 승인 대기 '+pend.length+'명</div><div class="stack" style="gap:8px;margin-bottom:6px;">';
       pend.forEach(function(su){
@@ -3323,7 +3426,7 @@ function rST(){
       h+='</div>';
     }
     var tf=S.memTierFilter||'all';
-    h+='<div class="tpick" style="margin-bottom:2px;">'+[['all','전체 '+S.members.length]].concat(TIERS.map(function(t){return [t.id,t.ic+' '+t.label+' '+S.members.filter(function(m){return memTier(m)===t.id;}).length];})).map(function(x){
+    h+='<div class="tpick" style="margin-bottom:2px;">'+[['all','전체 '+kkML.length]].concat(TIERS.map(function(t){return [t.id,t.ic+' '+t.label+' '+kkML.filter(function(m){return memTier(m)===t.id;}).length];})).map(function(x){
       return '<button class="stab-btn'+(tf===x[0]?' on':'')+'" data-mtfilter="'+x[0]+'">'+x[1]+'</button>';}).join('')+'</div>';
     h+='<div style="background:var(--wh);border:1.5px solid #D3DFDA;border-radius:var(--r);padding:.875rem 1rem;margin-bottom:10px;">'+
       '<div style="font-size:13px;font-weight:600;color:var(--pr);margin-bottom:8px;">+ 새 멤버 추가</div>'+
@@ -3356,8 +3459,8 @@ function rST(){
         '<button class="abtn full" id="am">+ 멤버 추가</button>'+
       '</div></div>'+
     '<div class="stack">';
-    if(!S.members.length)h+='<div class="empty">멤버가 없어요</div>';
-    S.members.forEach(function(m){
+    if(!kkML.length)h+='<div class="empty">'+(kkOld?'과거 멤버가 없어요':'아직 새로 가입한 멤버가 없어요')+'</div>';
+    kkML.forEach(function(m){
       if(tf!=='all'&&memTier(m)!==tf)return;
       h+='<div><div class="card" style="padding:.65rem .875rem;">'+
         '<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;">'+
