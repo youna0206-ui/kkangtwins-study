@@ -1072,8 +1072,7 @@ function rML(){
     '<div class="kk-checks"><label class="kk-auto"><input type="checkbox" id="kk-saveid"'+(kkSavedId()?' checked':'')+'> 아이디 저장</label>'+
     '<label class="kk-auto"><input type="checkbox" id="kk-auto" checked> 자동 로그인</label></div>'+
     '<div class="kk-hint">자동 로그인을 켜면 다음부터 이 기기에서 바로 들어가요</div>'+
-    '<div style="font-size:11.5px;color:var(--mu);text-align:center;line-height:1.6;">기존 멤버는 아이디 = 기존 닉네임 (예: 강둥맘1234)</div>'+
-    '<div class="kk-links"><button type="button" class="kk-linkbtn" data-kkfind="1">아이디 · 비밀번호 찾기</button><span>|</span><a href="'+KK_KAKAO+'" target="_blank">카카오톡 문의</a></div>'+
+        '<div class="kk-links"><button type="button" class="kk-linkbtn" data-kkfind="1">아이디 · 비밀번호 찾기</button><span>|</span><a href="'+KK_KAKAO+'" target="_blank">카카오톡 문의</a></div>'+
     '<button class="abtn sec full" id="go-signup" style="margin-top:2px;">처음이에요 · 가입 신청하기</button>'+
     '<button class="abtn sec full" data-kkhome="1" style="margin-top:2px;">← 홈페이지로</button></div></div></div>';
 }
@@ -1097,7 +1096,7 @@ function rSignup(){
     '<div style="font-size:11.5px;color:var(--mu);margin:-2px 2px 0;line-height:1.55;">스터디에서는 <b>강둥맘 / kkang_twins_</b> 처럼 표시돼요</div>'+
     lab('이메일',1)+'<input class="ainp" type="email" id="su-email" placeholder="예) mom@gmail.com" value="'+esc(f.em||'')+'" autocomplete="email" autocapitalize="off" autocorrect="off" spellcheck="false">'+
     '<div style="font-size:11.5px;color:var(--mu);margin:-2px 2px 0;line-height:1.55;">아이디·비밀번호를 찾을 때 써요. 이메일 1개로 아이디 1개만 만들 수 있어요</div>'+
-    lab('기존 멤버라면 예전 닉네임',0)+'<input class="ainp" type="text" id="su-oldnick" placeholder="예) 강둥맘1234 (처음이면 비워두세요)" value="'+esc(f.old||'')+'">'+
+    lab('기존 멤버라면 예전 닉네임',0)+'<input class="ainp" type="text" id="su-oldnick" placeholder="예) 강둥맘 (처음이면 비워두세요)" value="'+esc(f.old||'')+'">'+
     '<div style="font-size:11.5px;color:var(--mu);margin:-2px 2px 0;line-height:1.55;">적어 주시면 강둥맘이 예전 계정과 연결해 드려요. 인증 기록은 그대로 남아요</div>'+
     (S.suErr?'<p class="err">'+esc(S.suErr)+'</p>':'')+
     '<button class="abtn full" id="su-submit">가입 신청</button>'+
