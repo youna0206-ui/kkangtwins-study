@@ -205,6 +205,8 @@ button,input,select,textarea{font-family:inherit}
 .hd-left .hd-title{font-size:12px;font-weight:500;color:var(--mu);letter-spacing:0}
 .hd-right{flex-direction:row;align-items:center;gap:8px;margin-top:0}
 .hd-user{background:var(--prl);color:var(--pr);border-radius:0;padding:4px 10px;font-size:12px;font-weight:600}
+.hd-switch{border:1px solid var(--pr);cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px}
+.hd-switch .hd-sw{font-size:11px;font-weight:600;color:#FFFFFF;background:var(--pr);padding:2px 6px}
 .hd-btn{background:#FFFFFF;border:1px solid var(--br);color:var(--tx);border-radius:0;padding:6px 12px;font-size:12px;font-weight:600}
 .hd-btn#mlb{background:var(--pr);border-color:var(--pr);color:#FFFFFF}
 .tab.on,.tab.at.on,.tgl.on{background:var(--pr);box-shadow:none}
@@ -833,6 +835,8 @@ function render(){
 }
 // 앱 레벨 이벤트 위임 (re-render 후에도 항상 동작)
 document.addEventListener('click',function(e){
+  if(e.target.closest&&e.target.closest('#kk-toadm')){e.stopPropagation();kkToAdmin();return;}
+  if(e.target.closest&&e.target.closest('#kk-tomem')){e.stopPropagation();kkToMember();return;}
   var kkh=e.target.closest&&e.target.closest('[data-kkhome]');
   if(kkh){e.stopPropagation();S.home=true;S.memberErr='';render();window.scrollTo(0,0);return;}
   if(e.target.closest&&e.target.closest('[data-cancel-apply]'))return;
@@ -850,14 +854,20 @@ document.addEventListener('click',function(e){
   if(alllock){e.stopPropagation();var s2=S.studies.filter(function(x){return x.id===alllock.dataset.alllock;})[0];if(s2&&s2.weeks){s2.weeks.forEach(function(w){w.locked=true;});persist();}return;}
 });
 
+// 강둥맘 계정(아이디 kk2323)은 관리자 계정과 하나로: 오른쪽 위 버튼으로 화면 전환
+var KK_ADMIN_LOGIN='kk2323';
+function kkIsAdminMember(m){return !!m&&idNorm(memLoginId(m))===KK_ADMIN_LOGIN;}
+function kkToAdmin(){var m=S.loggedMember;if(!kkIsAdminMember(m))return;S.kkAdminMid=m.id;S.isAdmin=true;S.loggedMember=null;S.impersonating=false;S.ciDetail=null;S.home=false;S.tab='overall';try{localStorage.setItem('kkang_admin','1');}catch(e){}render();window.scrollTo(0,0);}
+function kkToMember(){var m=S.members.filter(function(x){return x.id===S.kkAdminMid;})[0];if(!m)return;S.isAdmin=false;S.impersonating=false;S.loggedMember=m;S.ciDetail=null;S.home=false;S.tab='ci';try{localStorage.removeItem('kkang_admin');}catch(e){}render();window.scrollTo(0,0);}
 function rApp(){
   var ia=S.isAdmin,im=!!S.loggedMember;
   var h='<div class="hd"><div class="hd-left"><button class="hd-logo" data-kkhome="1" aria-label="강둥이네 홈"><img src="'+KKH.word+'" alt="kkangtwins"></button><div class="hd-title">강둥이네 스터디</div>'+
     '</div>'+
     '<div class="hd-right">';
-  if(ia)h+='<span class="hd-user">관리자</span>';
+  if(ia)h+=(S.kkAdminMid?'<button class="hd-user hd-switch" id="kk-tomem" title="강둥맘 화면으로">관리자 <span class="hd-sw">⇄ 강둥맘</span></button>':'<span class="hd-user">관리자</span>');
+  else if(im&&!S.impersonating&&kkIsAdminMember(S.loggedMember))h+='<button class="hd-user hd-switch" id="kk-toadm" title="관리자 화면으로">'+tierOf(memTier(S.loggedMember)).ic+' '+esc(shortName(S.loggedMember))+' <span class="hd-sw">⇄ 관리자</span></button>';
   else if(im)h+='<span class="hd-user">'+tierOf(memTier(S.loggedMember)).ic+' '+esc(shortName(S.loggedMember))+'</span>';
-  else h+='<button class="hd-btn" id="mlb">로그인</button><button class="hd-btn" id="alb" style="font-size:10px;opacity:.75;">관리자</button>';
+  else h+='<button class="hd-btn" id="mlb">로그인</button>';
   h+='</div></div>';
   // 하단 탭바 (로그인 후)
   if(im||ia){
@@ -963,6 +973,10 @@ function rProfile(){
     '<div style="font-size:12px;font-weight:700;">로그인 아이디</div>'+
     '<input class="ainp" type="text" id="pf-id" value="'+esc(f.lid!==undefined?f.lid:memLoginId(m))+'" autocapitalize="off" autocorrect="off" spellcheck="false">'+
     '<div style="font-size:11.5px;color:var(--mu);margin-top:-4px;">지금 아이디를 그대로 써도 되고, 원하면 바꿀 수 있어요</div>'+
+    '<div style="font-size:12px;font-weight:700;">새 비밀번호 <span style="color:var(--rd);">*</span></div>'+
+    '<input class="ainp" type="password" id="pf-pw" placeholder="4자 이상" maxlength="30" autocomplete="new-password">'+
+    '<input class="ainp" type="password" id="pf-pw2" placeholder="새 비밀번호 확인" maxlength="30" autocomplete="new-password">'+
+    '<div style="font-size:11.5px;color:var(--mu);margin-top:-4px;">처음 받은 비밀번호 대신 나만 아는 비밀번호로 바꿔주세요</div>'+
     (S.pfErr?'<p class="err">'+esc(S.pfErr)+'</p>':'')+
     '<button class="abtn full" id="pf-save">저장하고 시작하기</button></div></div></div>';
 }
@@ -1776,8 +1790,7 @@ function rMP(){
     '<div style="font-size:15px;font-weight:700;margin-bottom:8px;">'+esc(m.name)+'님 전체 현황</div>'+
     '<div style="display:flex;gap:6px;margin-bottom:8px;">'+
     '<div class="stat-box"><div class="stat-label">참여 스터디</div><div class="stat-num" style="color:var(--pr);">'+tot.cnt+'</div></div>'+
-    '<div class="stat-box"><div class="stat-label">✅ 인증완료</div><div class="stat-num" style="font-size:18px;color:var(--gr);">'+tot.dw+'/'+tot.tw+'주</div></div>'+
-    '<div class="stat-box"><div class="stat-label">🏅 메달</div><div class="stat-num" style="font-size:16px;color:var(--tx);">'+mpMedalStr+'</div></div>'+
+    '<div class="stat-box"><div class="stat-label">🏅 메달</div><div class="stat-num" style="font-size:17px;color:var(--tx);white-space:nowrap;">'+mpMedalStr+'</div></div>'+
     '</div><div class="pb" style="height:12px;"><div class="pb-f" style="width:'+tot.pct+'%;"></div></div>'+
     '<div style="text-align:right;font-size:12px;color:var(--mu);">누적 인증률 '+tot.pct+'%</div></div>';
   // 카테고리별 그룹핑
@@ -1933,9 +1946,11 @@ function rMP(){
       var ss=sMSt(s,m);var aw=allWeeks(s);
       var chips=aw.map(function(w){
         var wst=ck(s.id,w.num,m.id);
-        var bg=wst==='done'?'var(--grb)':wst==='vacation'?'var(--bll)':'#F3F4F6';
-        var cl=wst==='done'?'#16A34A':wst==='vacation'?'var(--bld)':'var(--mu)';
-        return '<span style="font-size:10px;padding:2px 7px;border-radius:0;font-weight:600;border:1.5px solid '+(w.locked?'#E5E7EB':'var(--pr)')+';background:'+bg+';color:'+cl+';">'+(w.locked?'🔒':'🔓')+w.num+'주</span>';
+        var bg=wst==='done'?'var(--pr)':wst==='vacation'?'var(--bl)':'#FFFFFF';
+        var cl=wst==='done'||wst==='vacation'?'#FFFFFF':'var(--mu)';
+        var bd=wst==='done'?'var(--pr)':wst==='vacation'?'var(--bl)':(w.locked?'#E5E7EB':'var(--br)');
+        var ic=wst==='done'?'✓ ':wst==='vacation'?'🏖 ':(w.locked?'🔒':'');
+        return '<span style="font-size:11px;padding:3px 8px;border-radius:0;font-weight:'+(wst?'700':'500')+';border:1px solid '+bd+';background:'+bg+';color:'+cl+';">'+ic+w.num+'주</span>';
       }).join('');
       h+='<div class="card" style="padding:.875rem 1rem;margin-left:4px;">'+
         '<div class="rb" style="margin-bottom:4px;">'+
@@ -4065,15 +4080,20 @@ function bAll(){
     try{await fbPatchPath('signups',o);}catch(e){S.suErr='신청 저장에 실패했어요. 인터넷 연결을 확인해주세요';render();return;}
     S.signups[id]=rec;S.signupDone=rec.name;S.signupDoneId=lid;S.suErr='';S.suForm={};render();
   });
-  on('pf-save',function(){
+  on('pf-save',async function(){
     var v=function(id){var e=g(id);return e?e.value:'';};
-    var mom=v('pf-mom').trim(),insta=v('pf-insta').trim().replace(/^@/,''),lid=v('pf-id').trim();
+    var mom=v('pf-mom').trim(),insta=v('pf-insta').trim().replace(/^@/,''),lid=v('pf-id').trim(),npw=v('pf-pw'),npw2=v('pf-pw2');
     S.pfForm={mom:mom,insta:insta,lid:lid};
     var m=S.members.filter(function(x){return x.id===S.loggedMember.id;})[0]||S.loggedMember;
     if(!mom){S.pfErr='닉네임(00맘)을 입력해주세요';render();return;}
     if(!insta){S.pfErr='인스타 아이디를 입력해주세요';render();return;}
     if(!lid){S.pfErr='아이디를 입력해주세요';render();return;}
     if(idTaken(lid,m.id)){S.pfErr='이미 사용 중인 아이디예요';render();return;}
+    if(!npw){S.pfErr='새 비밀번호를 입력해주세요';render();return;}
+    if(npw.length<4){S.pfErr='비밀번호는 4자 이상으로 정해주세요';render();return;}
+    if(npw!==npw2){S.pfErr='새 비밀번호가 일치하지 않아요';render();return;}
+    try{if(await checkPw(m,npw)){S.pfErr='처음 받은 비밀번호와 다른 비밀번호로 정해주세요';render();return;}
+      await setPw(m,npw);}catch(e){S.pfErr='이 브라우저에서는 비밀번호 저장이 어려워요. 다른 브라우저로 열어주세요.';render();return;}
     m.momName=mom;m.insta=insta;m.loginId=lid;m.name=dispName(mom,insta);
     S.loggedMember=m;S.pfErr='';S.pfForm=null;
     S.members.sort(function(a,b){try{return a.name.localeCompare(b.name,'ko');}catch(e){return 0;}});
@@ -4215,7 +4235,10 @@ function applyData(d){
       }
     }
   }catch(e){}
-  try{if(!S.loggedMember&&localStorage.getItem('kkang_admin')==='1'){S.isAdmin=true;S.home=false;S.tab='overall';}}catch(e){}
+  try{if(localStorage.getItem('kkang_admin')==='1'){
+    if(S.loggedMember&&kkIsAdminMember(S.loggedMember)){S.kkAdminMid=S.loggedMember.id;S.loggedMember=null;S.isAdmin=true;S.home=false;S.tab='overall';}
+    else if(!S.loggedMember){S.isAdmin=true;S.home=false;S.tab='overall';}
+  }}catch(e){}
   S.loading=false;render();
 }
 (async function(){
