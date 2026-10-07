@@ -247,6 +247,7 @@ button,input,select,textarea{font-family:inherit}
 .kk-bd-act .sd-big{flex:1 1 100%}
 .kk-del{background:var(--rd);color:#FFFFFF;border:1px solid var(--rd);font-family:inherit;font-size:12px;font-weight:700;padding:5px 10px;line-height:1.2;cursor:pointer;white-space:nowrap;flex:0 0 auto}
 .kk-del-lg{display:block;margin:10px auto 0;font-size:13.5px;padding:10px 18px}
+.kk-band{display:inline-flex;align-items:center;gap:5px;margin-top:6px;font-size:12.5px;font-weight:700;color:#FFFFFF;background:#03C75A;padding:5px 12px;text-decoration:none;white-space:nowrap}
 .kk-links{display:flex;justify-content:center;align-items:center;gap:10px;font-size:13px;color:var(--mu)}
 .kk-links a,.kk-linkbtn{color:var(--pr);font-weight:600;text-decoration:underline;text-underline-offset:4px;background:none;border:none;padding:4px 0;cursor:pointer;font-size:13px;font-family:inherit}
 .kk-sub{font-size:14px;font-weight:700;color:var(--tx);margin:2px 2px -2px}
@@ -1159,7 +1160,7 @@ async function kkMergeAccounts(){
 function kkBoardHtml(s,m,aw,ss,curWk,ended,b){
   var h='<div class="kk-bd-head"><div class="kk-bd-cat">'+esc(s.cat||'')+' 게시판</div><div class="kk-bd-title">'+esc(s.name)+'</div>'+
     '<div class="kk-bd-meta">'+[kkStartLbl(s),ended?'시즌 종료':(curWk>0?'지금 '+curWk+'주차':''),'전체 '+ss.t+'주'].filter(Boolean).join(' · ')+(b?' · '+b.badge+' '+esc(b.label):'')+'</div>'+
-    '<div class="kk-bd-my"><span>내 인증 <b>'+ss.dn+'</b>/'+ss.t+'주'+(ss.vc?' · 휴가 '+ss.vc:'')+'</span><div class="kk-bd-bar"><i style="width:'+ss.pct+'%"></i></div><b style="color:var(--pr)">'+ss.pct+'%</b></div></div>';
+    (s.bandUrl?'<a class="kk-band" href="'+esc(s.bandUrl)+'" target="_blank" rel="noopener" style="margin-top:10px">🎵 스터디 밴드 바로가기</a>':'')+'<div class="kk-bd-my"><span>내 인증 <b>'+ss.dn+'</b>/'+ss.t+'주'+(ss.vc?' · 휴가 '+ss.vc:'')+'</span><div class="kk-bd-bar"><i style="width:'+ss.pct+'%"></i></div><b style="color:var(--pr)">'+ss.pct+'%</b></div></div>';
   if(!ended&&s.startDate&&curWk===0)h+='<div class="kk-bd-info">'+(+s.startDate.split('-')[1])+'/'+(+s.startDate.split('-')[2])+'에 시작해요</div>';
   if(ended)h+='<div class="kk-bd-info">'+(ss.pct===100?'모든 주차를 완주했어요. 수고 많으셨어요!':'시즌이 끝났어요. 수고 많으셨어요!')+'</div>';
   var P=S.kkPost||(S.kkPost={});
@@ -2365,7 +2366,8 @@ function rApply(){
       var aw=allWeeks(s);
       h+='<div class="apply-card"><div class="rb" style="margin-bottom:0;">'+
         '<div><div style="font-size:14px;font-weight:600;">'+esc(s.name)+'</div>'+
-          '<div style="font-size:11px;color:var(--mu);margin-top:2px;">'+(isRoutine?'날짜별 루틴':aw.length+'주 진행')+'</div></div>'+
+          '<div style="font-size:11px;color:var(--mu);margin-top:2px;">'+(isRoutine?'날짜별 루틴':aw.length+'주 진행')+'</div>'+
+          (s.bandUrl?'<a class="kk-band" href="'+esc(s.bandUrl)+'" target="_blank" rel="noopener">🎵 스터디 밴드 바로가기</a>':'')+'</div>'+
         '<button class="abtn sec" data-cancel-apply="'+s.id+'" style="font-size:12px;padding:5px 12px;">취소</button>'+
       '</div></div>';
     });
@@ -4468,11 +4470,48 @@ function doDM(id){
   S.members=S.members.filter(function(m){return m.id!==id;});
   if(S.expandedMem===id)S.expandedMem=null;persist();
 }
+function kkArr(x){return Array.isArray(x)?x.filter(Boolean):(x&&typeof x==='object'?Object.values(x).filter(Boolean):[]);}
+function kkSetBase(){var b={m:{},s:{}};(S.members||[]).forEach(function(m){if(m&&m.id)b.m[m.id]=JSON.stringify(m);});(S.studies||[]).forEach(function(s){if(s&&s.id)b.s[s.id]=JSON.stringify(s);});S._kkBase=b;}
+// 내가 불러온 뒤 바꾼 항목만 내 것으로, 나머지는 서버 최신 것으로 합침 (추가·삭제도 구분)
+function kkMergeList(local,server,base){
+  var L={},Sv={},out=[],seen={};
+  local.forEach(function(x){if(x&&x.id)L[x.id]=x;});server.forEach(function(x){if(x&&x.id)Sv[x.id]=x;});
+  var pick=function(id){
+    var l=L[id],sv=Sv[id],inB=base[id]!==undefined;
+    if(l&&sv)return (inB&&JSON.stringify(l)===base[id])?sv:l;
+    if(l&&!sv)return inB?null:l;          // 서버에서 지워진 것 → 지움 / 내가 새로 추가 → 유지
+    if(!l&&sv)return inB?null:sv;         // 내가 지운 것 → 지움 / 다른 사람이 추가 → 유지
+    return null;
+  };
+  server.concat(local).forEach(function(x){if(!x||!x.id||seen[x.id])return;seen[x.id]=1;var v=pick(x.id);if(v)out.push(v);});
+  return out;
+}
 async function persist(){
   S.saving=true;
   // 체크인은 별도(persistCk/fbPatchCheckins)로만 저장하며, 여기서는 절대 건드리지 않는다.
-  // (동시 접속 중인 다른 사용자의 체크인을 오래된 로컬 스냅샷으로 덮어쓰는 것을 방지)
-  try{await fetch(FIREBASE_URL+DB_PATH,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({studies:S.studies,members:S.members,catOrder:S.catOrder,events:S.events,skipWeeks:S.skipWeeks})}).then(function(r){if(!r.ok)throw new Error(r.status);});}
+  try{
+    var base=S._kkBase||{m:{},s:{}};
+    var cur=await fetch(FIREBASE_URL+DB_PATH.replace('.json','/members.json')).then(function(r){if(!r.ok)throw new Error(r.status);return r.json();});
+    var srvM=kkArr(cur);
+    var mem=srvM.length?kkMergeList(S.members||[],srvM,base.m):(S.members||[]); // 서버가 비어 있으면(오류 등) 아무것도 지우지 않음
+    var body={members:mem};
+    if(S.isAdmin){
+      var cs=await fetch(FIREBASE_URL+DB_PATH.replace('.json','/studies.json')).then(function(r){if(!r.ok)throw new Error(r.status);return r.json();});
+      var srvS=kkArr(cs);
+      body.studies=srvS.length?kkMergeList(S.studies||[],srvS,base.s):(S.studies||[]);
+      body.catOrder=S.catOrder;body.events=S.events;body.skipWeeks=S.skipWeeks;
+    }
+    await fetch(FIREBASE_URL+DB_PATH,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){if(!r.ok)throw new Error(r.status);});
+    var lm=S.loggedMember&&S.loggedMember.id;
+    S.members=mem.slice().sort(function(a,b){try{return a.name.localeCompare(b.name,'ko');}catch(e){return 0;}});
+    if(body.studies){S.studies=body.studies;S.studies.forEach(function(s){
+      if(!s.weeks||!s.weeks.length)s.weeks=[{num:1,locked:false,materialUrl:''}];
+      if(s.applyOpen===undefined)s.applyOpen=false;if(s.dayOfWeek===undefined)s.dayOfWeek='';if(s.bandUrl===undefined)s.bandUrl='';if(s.startDate===undefined)s.startDate='';
+      if(!s.snotices)s.snotices=[];if(!s.cardDecks)s.cardDecks=[];s.cardDecks.forEach(function(cd){if(!cd.cards)cd.cards=[];});
+      s.weeks.forEach(function(w){if(w.materialUrl===undefined)w.materialUrl='';if(w.note===undefined)w.note='';});});}
+    kkSetBase();
+    if(lm){var nm=S.members.filter(function(x){return x.id===lm;})[0];if(nm)S.loggedMember=nm;}
+  }
   catch(e){alert('저장 실패. 인터넷 연결을 확인해주세요.');}
   S.saving=false;render();
 }
@@ -4482,6 +4521,9 @@ async function persistNotices(){
   render();
 }
 function applyData(d){
+  try{return kkApplyData0(d);}finally{kkSetBase();}
+}
+function kkApplyData0(d){
   S.studies=d&&d.studies&&d.studies.length?d.studies:JSON.parse(JSON.stringify(DEFAULT_STUDIES));
   var dbMems=d&&d.members&&d.members.length?d.members:[];
   if(dbMems.length){
