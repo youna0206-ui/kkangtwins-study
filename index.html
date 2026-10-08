@@ -248,6 +248,9 @@ button,input,select,textarea{font-family:inherit}
 .kk-del{position:absolute;top:6px;right:8px;z-index:1;background:var(--rd);color:#FFFFFF;border:none;font-family:inherit;font-size:9.5px;font-weight:700;padding:2px 6px;line-height:1.4;cursor:pointer;white-space:nowrap}
 .kk-del-lg{position:static;display:block;margin:10px auto 0;font-size:13.5px;padding:10px 18px;background:var(--rd);color:#FFFFFF;border:1px solid var(--rd)}
 .kk-band{display:inline-flex;align-items:center;gap:5px;margin-top:6px;font-size:12.5px;font-weight:700;color:#FFFFFF;background:#03C75A;padding:5px 12px;text-decoration:none;white-space:nowrap}
+.kk-agree{display:flex;gap:9px;align-items:flex-start;padding:12px;border:1px solid var(--br);background:#F7FAF8;font-size:13px;line-height:1.55;cursor:pointer}
+.kk-agree input{width:18px;height:18px;accent-color:var(--pr);margin:2px 0 0;flex:0 0 auto}
+.kk-agree-d{display:block;font-size:11.5px;color:var(--mu);margin-top:4px;font-weight:400}
 .kk-links{display:flex;justify-content:center;align-items:center;gap:10px;font-size:13px;color:var(--mu)}
 .kk-links a,.kk-linkbtn{color:var(--pr);font-weight:600;text-decoration:underline;text-underline-offset:4px;background:none;border:none;padding:4px 0;cursor:pointer;font-size:13px;font-family:inherit}
 .kk-sub{font-size:14px;font-weight:700;color:var(--tx);margin:2px 2px -2px}
@@ -504,7 +507,44 @@ function kkSha256Hex(str){
   }
   return H.map(function(x){return ('00000000'+(x>>>0).toString(16)).slice(-8);}).join('');
 }
-async function hashPw(mid,pw){
+function kkUtf8(s){var b=unescape(encodeURIComponent(s)),a=new Array(b.length);for(var i=0;i<b.length;i++)a[i]=b.charCodeAt(i)&255;return a;}
+var KK_K=[0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
+function kkSha256B(bytes){
+  var n=bytes.length,len=((n+9+63)>>6)<<4,words=new Array(len),i,j;for(i=0;i<len;i++)words[i]=0;
+  for(i=0;i<n;i++)words[i>>2]|=bytes[i]<<(24-(i%4)*8);
+  words[n>>2]|=0x80<<(24-(n%4)*8);words[len-1]=n*8;
+  var H=[0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19],w=new Array(64),a,b,c,d,e,f,g,h,t1,t2;
+  for(i=0;i<len;i+=16){a=H[0];b=H[1];c=H[2];d=H[3];e=H[4];f=H[5];g=H[6];h=H[7];
+    for(j=0;j<64;j++){
+      if(j<16)w[j]=words[i+j]|0;
+      else{var x=w[j-15],y=w[j-2];var s0=((x>>>7)|(x<<25))^((x>>>18)|(x<<14))^(x>>>3),s1=((y>>>17)|(y<<15))^((y>>>19)|(y<<13))^(y>>>10);w[j]=(w[j-16]+s0+w[j-7]+s1)|0;}
+      t1=(h+(((e>>>6)|(e<<26))^((e>>>11)|(e<<21))^((e>>>25)|(e<<7)))+((e&f)^(~e&g))+KK_K[j]+w[j])|0;
+      t2=((((a>>>2)|(a<<30))^((a>>>13)|(a<<19))^((a>>>22)|(a<<10)))+((a&b)^(a&c)^(b&c)))|0;
+      h=g;g=f;f=e;e=(d+t1)|0;d=c;c=b;b=a;a=(t1+t2)|0;}
+    H[0]=(H[0]+a)|0;H[1]=(H[1]+b)|0;H[2]=(H[2]+c)|0;H[3]=(H[3]+d)|0;H[4]=(H[4]+e)|0;H[5]=(H[5]+f)|0;H[6]=(H[6]+g)|0;H[7]=(H[7]+h)|0;}
+  var out=[];H.forEach(function(v){out.push((v>>>24)&255,(v>>>16)&255,(v>>>8)&255,v&255);});return out;
+}
+function kkPbkdf2Js(pw,salt,iter){
+  var key=kkUtf8(pw);if(key.length>64)key=kkSha256B(key);while(key.length<64)key.push(0);
+  var ip=key.map(function(x){return x^0x36;}),op=key.map(function(x){return x^0x5c;});
+  var hmac=function(m){return kkSha256B(op.concat(kkSha256B(ip.concat(m))));};
+  var u=hmac(kkUtf8(salt).concat([0,0,0,1])),t=u.slice();
+  for(var i=1;i<iter;i++){u=hmac(u);for(var k=0;k<32;k++)t[k]^=u[k];}
+  return t.map(function(x){return ('0'+x.toString(16)).slice(-2);}).join('');
+}
+
+var KK_PW_ITER=50000;
+async function kkPbkdf2Fmt(salt,pw,iter){
+  var sl='kkang|'+salt,hex;
+  if(window.crypto&&crypto.subtle&&window.TextEncoder){
+    var k=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveBits']);
+    var bits=await crypto.subtle.deriveBits({name:'PBKDF2',salt:new TextEncoder().encode(sl),iterations:iter,hash:'SHA-256'},k,256);
+    hex=Array.from(new Uint8Array(bits)).map(function(b){return b.toString(16).padStart(2,'0');}).join('');
+  } else hex=kkPbkdf2Js(pw,sl,iter);
+  return 'p2$'+iter+'$'+hex;
+}
+async function hashPw(mid,pw){return kkPbkdf2Fmt(mid,pw,KK_PW_ITER);}
+async function hashPwOld(mid,pw){
   if(!(window.crypto&&crypto.subtle&&window.TextEncoder))return kkSha256Hex('kkang|'+mid+'|'+pw);
   var buf=new TextEncoder().encode('kkang|'+mid+'|'+pw);
   var h=await crypto.subtle.digest('SHA-256',buf);
@@ -512,8 +552,12 @@ async function hashPw(mid,pw){
 }
 async function checkPw(m,pw){
   if(!m||!pw)return false;
-  if(m.pwh)return m.pwh===await hashPw(m.pwSalt||m.id,pw);
-  return m.pw!==undefined&&String(m.pw)===pw;
+  var salt=m.pwSalt||m.id;
+  if(m.pwh&&m.pwh.indexOf('p2$')===0){var it=+m.pwh.split('$')[1]||KK_PW_ITER;return m.pwh===await kkPbkdf2Fmt(salt,pw,it);}
+  var ok=m.pwh?(m.pwh===await hashPwOld(salt,pw)):(m.pw!==undefined&&String(m.pw)===pw);
+  // 예전 방식으로 저장된 비밀번호는 맞게 입력한 순간 안전한 방식으로 바꿔 저장
+  if(ok&&S.members&&S.members.indexOf(m)>=0){try{m.pwh=await hashPw(salt,pw);delete m.pw;setTimeout(function(){persist();},30);}catch(e){}}
+  return ok;
 }
 async function setPw(m,pw){m.pwh=await hashPw(m.id,pw);delete m.pw;delete m.pwSalt;}
 function nickNorm(s){return String(s||'').replace(/\s+/g,'').toLowerCase();}
@@ -919,6 +963,7 @@ document.addEventListener('click',function(e){
   if(kq('#kf-findid')){e.stopPropagation();kkFindId();return;}
   if(kq('#kf-reset')){e.stopPropagation();kkResetReq();return;}
   var kp=kq('[data-kkpost]');if(kp){e.stopPropagation();var pk=kp.getAttribute('data-kkpost');S.kkPost=S.kkPost||{};var cur=kp.classList.contains('on');S.kkPost[pk]=!cur;render();return;}
+  if(kq('#kk-backup')){e.stopPropagation();kkBackup();return;}
   if(kq('#kkmg-go')){e.stopPropagation();kkMergeAccounts();return;}
   var kl=kq('[data-kklink]');if(kl){e.stopPropagation();kkLinkSignup(kl.getAttribute('data-kklink'));return;}
   var ks=kq('[data-kkrs]');if(ks){e.stopPropagation();kkSetTempPw(ks.getAttribute('data-kkrs'));return;}
@@ -1072,7 +1117,7 @@ function kkAdminExtraHtml(){var h='';
   if(rs.length){h+='<div style="font-size:13px;font-weight:800;color:var(--rd);">🔑 비밀번호 재설정 요청 '+rs.length+'명</div><div class="stack" style="gap:8px;margin-bottom:6px;">';
     rs.forEach(function(q){var d=new Date(q.at);h+='<div class="pend-card"><div style="display:flex;gap:8px;align-items:center;"><b style="flex:1;font-size:14px;">'+esc(q.name||'')+'</b><span style="font-size:11px;color:var(--mu);">'+(d.getMonth()+1)+'/'+d.getDate()+' 요청</span></div>'+
       '<div style="font-size:12px;margin-top:3px;">🆔 '+esc(q.loginId||'')+'</div>'+
-      '<div style="display:flex;gap:6px;margin-top:8px;"><input class="ainp" type="text" id="kkrs-'+q.mid+'" placeholder="임시 비밀번호 (4자 이상)" style="min-height:40px;">'+
+      '<div style="display:flex;gap:6px;margin-top:8px;"><input class="ainp" type="text" id="kkrs-'+q.mid+'" placeholder="임시 비밀번호 (6자 이상)" style="min-height:40px;">'+
       '<button class="abtn sm" data-kkrs="'+q.mid+'">설정</button><button class="abtn sec sm" data-kkrsdel="'+q.mid+'">삭제</button></div>'+
       '<div class="kk-hint" style="margin-top:6px;">설정한 임시 비밀번호를 카카오톡으로 전달해 주세요. 멤버는 첫 로그인 때 새 비밀번호로 바꾸게 돼요.</div></div>';});
     h+='</div>';}
@@ -1097,7 +1142,7 @@ async function kkLinkSignup(sid){var su=S.signups[sid];if(!su)return;var sel=g('
   delete S.signups[sid];showToast('🔗 '+su.name+'님 기존 계정에 연결 완료','success');render();}
 async function kkSetTempPw(mid){var m=S.members.filter(function(x){return x.id===mid;})[0];var inp=g('kkrs-'+mid),pw=inp?inp.value:'';
   if(!m){alert('멤버를 찾지 못했어요');return;}
-  if(pw.length<4){alert('임시 비밀번호를 4자 이상 입력해 주세요');return;}
+  if(pw.length<6){alert('임시 비밀번호를 6자 이상 입력해 주세요');return;}
   if(!confirm(m.name+'님 비밀번호를 임시 비밀번호로 바꿀까요?'))return;
   await setPw(m,pw);m.pwTemp=true;await persist();
   var o={};o[mid]=null;try{await fbPatchPath('pwresets',o);}catch(e){}
@@ -1189,6 +1234,13 @@ function kkBoardHtml(s,m,aw,ss,curWk,ended,b){
   return h+'</div>';
 }
 function kkIsNewMem(m){return !!m.emailH||(typeof KK_ADMIN_LOGINS!=='undefined'&&KK_ADMIN_LOGINS.indexOf(idNorm(memLoginId(m)))>=0);}
+function kkBackup(){
+  var d=new Date(),p=function(n){return ('0'+n).slice(-2);},stamp=d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+'_'+p(d.getHours())+p(d.getMinutes());
+  var data={savedAt:d.toISOString(),studies:S.studies,members:S.members,checkins:S.checkins,signups:S.signups,catOrder:S.catOrder,events:S.events,skipWeeks:S.skipWeeks,notices:S.notices};
+  var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(data)],{type:'application/json'}));a.download='kkangtwins_backup_'+stamp+'.json';
+  document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove();},1000);
+  showToast('💾 백업 파일을 저장했어요. 안전한 곳에 보관해 주세요','success');
+}
 function rML(){
   return '<div class="login-wrap"><div class="login-box"><h2>👋 로그인</h2>'+
     '<p>아이디와 비밀번호를 입력해주세요</p>'+
@@ -1216,7 +1268,7 @@ function rSignup(){
     '<p>신청 후 강둥맘이 승인하면 이용할 수 있어요</p>'+
     '<div class="lstack">'+
     lab('아이디',1)+'<input class="ainp" type="text" id="su-id" placeholder="영문 소문자·숫자 4~20자" value="'+esc(f.lid||'')+'" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false">'+
-    lab('비밀번호',1)+'<input class="ainp" type="password" id="su-pw" placeholder="4자 이상" maxlength="30" autocomplete="new-password">'+
+    lab('비밀번호',1)+'<input class="ainp" type="password" id="su-pw" placeholder="6자 이상" maxlength="30" autocomplete="new-password">'+
     '<input class="ainp" type="password" id="su-pw2" placeholder="비밀번호 확인" maxlength="30" autocomplete="new-password">'+
     lab('닉네임 (00맘)',1)+'<input class="ainp" type="text" id="su-mom" placeholder="예) 강둥맘" value="'+esc(f.mom||'')+'">'+
     lab('인스타 아이디',1)+'<input class="ainp" type="text" id="su-insta" placeholder="예) kkang_twins_" value="'+esc(f.insta||'')+'" autocapitalize="off" autocorrect="off" spellcheck="false">'+
@@ -1225,6 +1277,8 @@ function rSignup(){
     '<div style="font-size:11.5px;color:var(--mu);margin:-2px 2px 0;line-height:1.55;">아이디·비밀번호를 찾을 때 써요. 이메일 1개로 아이디 1개만 만들 수 있어요</div>'+
     lab('기존 멤버라면 예전 닉네임',0)+'<input class="ainp" type="text" id="su-oldnick" placeholder="예) 강둥맘 (처음이면 비워두세요)" value="'+esc(f.old||'')+'">'+
     '<div style="font-size:11.5px;color:var(--mu);margin:-2px 2px 0;line-height:1.55;">적어 주시면 강둥맘이 예전 계정과 연결해 드려요. 인증 기록은 그대로 남아요</div>'+
+    '<label class="kk-agree"><input type="checkbox" id="su-agree"'+(f.agree?' checked':'')+'><span><b>[필수] 개인정보 수집·이용에 동의해요</b>'+
+      '<span class="kk-agree-d">수집 항목: 아이디, 닉네임, 인스타 아이디, 이메일(암호화해서 저장)<br>이용 목적: 회원 확인, 스터디 운영, 아이디·비밀번호 찾기<br>보관 기간: 탈퇴를 요청할 때까지 (카카오톡 문의로 요청)<br>동의하지 않으면 가입할 수 없어요</span></span></label>'+
     (S.suErr?'<p class="err">'+esc(S.suErr)+'</p>':'')+
     '<button class="abtn full" id="su-submit">가입 신청</button>'+
     '<button class="abtn sec full" id="su-back">로그인 화면으로</button>'+
@@ -1244,7 +1298,7 @@ function rProfile(){
     '<input class="ainp" type="text" id="pf-id" value="'+esc(f.lid!==undefined?f.lid:memLoginId(m))+'" autocapitalize="off" autocorrect="off" spellcheck="false">'+
     '<div style="font-size:11.5px;color:var(--mu);margin-top:-4px;">지금 아이디를 그대로 써도 되고, 원하면 바꿀 수 있어요</div>'+
     '<div style="font-size:12px;font-weight:700;">새 비밀번호 <span style="color:var(--rd);">*</span></div>'+
-    '<input class="ainp" type="password" id="pf-pw" placeholder="4자 이상" maxlength="30" autocomplete="new-password">'+
+    '<input class="ainp" type="password" id="pf-pw" placeholder="6자 이상" maxlength="30" autocomplete="new-password">'+
     '<input class="ainp" type="password" id="pf-pw2" placeholder="새 비밀번호 확인" maxlength="30" autocomplete="new-password">'+
     '<div style="font-size:11.5px;color:var(--mu);margin-top:-4px;">처음 받은 비밀번호 대신 나만 아는 비밀번호로 바꿔주세요</div>'+
     (S.pfErr?'<p class="err">'+esc(S.pfErr)+'</p>':'')+
@@ -3121,7 +3175,7 @@ function rST(){
   var subtabs=[['study','📚 스터디 관리'],['member','👥 멤버관리'+(pendingCount()?' 🔴'+pendingCount():'')],['oldmem','🗂️ 과거 멤버'],['import','📦 데이터 가져오기']];
   var h='<div class="stack" style="gap:12px;"><div style="display:flex;gap:5px;overflow-x:auto;scrollbar-width:none;">';
   subtabs.forEach(function(t){h+='<button class="stab-btn'+(S.settingsTab===t[0]?' on':'')+'" data-stab="'+t[0]+'">'+t[1]+'</button>';});
-  h+='</div>';
+  h+='<button class="stab-btn" id="kk-backup">💾 백업 받기</button></div>';
 
   if(S.settingsTab==='study'){
     // 새 스터디 추가
@@ -4006,6 +4060,7 @@ function bAll(){
     var mm=S.members.filter(function(x){return x.id===m.id;})[0]||m;
     if(!(await checkPw(mm,cur))){S.chgErr='현재 비밀번호가 틀렸어요';S.chgOk='';render();return;}
     if(!nw){S.chgErr='새 비밀번호를 입력해주세요';S.chgOk='';render();return;}
+    if(nw.length<6){S.chgErr='새 비밀번호는 6자 이상으로 정해주세요';S.chgOk='';render();return;}
     if(nw!==nw2){S.chgErr='새 비밀번호가 일치하지 않아요';S.chgOk='';render();return;}
     var ix=S.members.findIndex(function(x){return x.id===m.id;});
     if(ix>=0){await setPw(S.members[ix],nw);S.loggedMember=S.members[ix];}
@@ -4360,17 +4415,20 @@ function bAll(){
   on('su-submit',async function(){
     var v=function(id){var e=g(id);return e?e.value:'';};
     var lid=idNorm(v('su-id')),pw=v('su-pw'),pw2=v('su-pw2'),mom=v('su-mom').trim(),insta=v('su-insta').trim().replace(/^@/,''),em=kkEm(v('su-email')),old=v('su-oldnick').trim();
-    S.suForm={lid:lid,mom:mom,insta:insta,em:em,old:old};
+    var agree=!!(g('su-agree')&&g('su-agree').checked);
+    S.suForm={lid:lid,mom:mom,insta:insta,em:em,old:old,agree:agree};
     if(!/^[a-z0-9._]{4,20}$/.test(lid)){S.suErr='아이디는 영문 소문자·숫자(._ 가능) 4~20자로 만들어주세요';render();return;}
     if(idTaken(lid)){S.suErr='이미 사용 중인 아이디예요. 다른 아이디를 써주세요';render();return;}
-    if(pw.length<4){S.suErr='비밀번호를 4자 이상 입력해주세요';render();return;}
+    if(pw.length<6){S.suErr='비밀번호를 6자 이상 입력해주세요';render();return;}
     if(pw!==pw2){S.suErr='비밀번호 확인이 일치하지 않아요';render();return;}
     if(!mom){S.suErr='닉네임(00맘)을 입력해주세요';render();return;}
     if(!insta){S.suErr='인스타 아이디를 입력해주세요';render();return;}
     if(!kkEmailOk(em)){S.suErr='이메일을 정확히 입력해주세요';render();return;}
     var emT=kkEmailTaken(em);if(emT){S.suErr=emT;render();return;}
+    if(!agree){S.suErr='개인정보 수집·이용에 동의해 주세요';render();return;}
     var id=uid(),rec={id:id,loginId:lid,momName:mom,insta:insta,name:dispName(mom,insta),createdAt:Date.now(),emailH:kkEmailH(em),emailMask:kkEmailMask(em)};
     if(old)rec.oldNick=old;
+    rec.agreedAt=Date.now();
     try{rec.pwh=await hashPw(id,pw);}catch(e){S.suErr='이 브라우저에서는 가입이 어려워요. 다른 브라우저로 열어주세요.';render();return;}
     var o={};o[id]=rec;
     try{await fbPatchPath('signups',o);}catch(e){S.suErr='신청 저장에 실패했어요. 인터넷 연결을 확인해주세요';render();return;}
@@ -4386,7 +4444,7 @@ function bAll(){
     if(!lid){S.pfErr='아이디를 입력해주세요';render();return;}
     if(idTaken(lid,m.id)){S.pfErr='이미 사용 중인 아이디예요';render();return;}
     if(!npw){S.pfErr='새 비밀번호를 입력해주세요';render();return;}
-    if(npw.length<4){S.pfErr='비밀번호는 4자 이상으로 정해주세요';render();return;}
+    if(npw.length<6){S.pfErr='비밀번호는 6자 이상으로 정해주세요';render();return;}
     if(npw!==npw2){S.pfErr='새 비밀번호가 일치하지 않아요';render();return;}
     try{if(await checkPw(m,npw)){S.pfErr='처음 받은 비밀번호와 다른 비밀번호로 정해주세요';render();return;}
       await setPw(m,npw);delete m.pwTemp;}catch(e){S.pfErr='이 브라우저에서는 비밀번호 저장이 어려워요. 다른 브라우저로 열어주세요.';render();return;}
@@ -4416,7 +4474,7 @@ function bAll(){
     var sids=[];document.querySelectorAll('.pa-'+sid+':checked').forEach(function(cb){sids.push(cb.value);});
     var snames=S.studies.filter(function(s){return sids.indexOf(s.id)>=0;}).map(function(s){return s.name;});
     if(!confirm(su.name+'님을 '+tierOf(tier).ic+' '+tierOf(tier).label+' 멤버로 승인할까요?\n\n배정 스터디: '+(snames.length?snames.join(', '):'없음')))return;
-    S.members.push({id:su.id,loginId:su.loginId,momName:su.momName,insta:su.insta||'',name:su.name,pwh:su.pwh,tier:tier,studyIds:sids,joinedAt:Date.now(),emailH:su.emailH||'',emailMask:su.emailMask||''});
+    S.members.push({id:su.id,loginId:su.loginId,momName:su.momName,insta:su.insta||'',name:su.name,pwh:su.pwh,agreedAt:su.agreedAt||null,tier:tier,studyIds:sids,joinedAt:Date.now(),emailH:su.emailH||'',emailMask:su.emailMask||''});
     S.members.sort(function(a,b){try{return a.name.localeCompare(b.name,'ko');}catch(e){return 0;}});
     await persist();
     var o={};o[sid]=null;try{await fbPatchPath('signups',o);}catch(e){}
