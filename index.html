@@ -251,6 +251,13 @@ button,input,select,textarea{font-family:inherit}
 .kk-agree{display:flex;gap:9px;align-items:flex-start;padding:12px;border:1px solid var(--br);background:#F7FAF8;font-size:13px;line-height:1.55;cursor:pointer}
 .kk-agree input{width:18px;height:18px;accent-color:var(--pr);margin:2px 0 0;flex:0 0 auto}
 .kk-agree-d{display:block;font-size:11.5px;color:var(--mu);margin-top:4px;font-weight:400}
+.kk-msearch{display:flex;gap:6px;align-items:center;margin:2px 0}
+.kk-msearch input{flex:1}
+.kk-msres{font-size:13px;padding:8px 2px 2px}
+.kk-msrow{font-size:13px;padding:7px 2px;border-bottom:1px solid var(--br);line-height:1.5}
+.kk-mstag{display:inline-block;font-size:11px;font-weight:700;padding:1px 6px;margin-right:6px;color:#FFFFFF;background:var(--pr)}
+.kk-mstag.old{background:#8A8F8C}
+.kk-mstag.pend{background:var(--or)}
 .kk-links{display:flex;justify-content:center;align-items:center;gap:10px;font-size:13px;color:var(--mu)}
 .kk-links a,.kk-linkbtn{color:var(--pr);font-weight:600;text-decoration:underline;text-underline-offset:4px;background:none;border:none;padding:4px 0;cursor:pointer;font-size:13px;font-family:inherit}
 .kk-sub{font-size:14px;font-weight:700;color:var(--tx);margin:2px 2px -2px}
@@ -963,6 +970,7 @@ document.addEventListener('click',function(e){
   if(kq('#kf-findid')){e.stopPropagation();kkFindId();return;}
   if(kq('#kf-reset')){e.stopPropagation();kkResetReq();return;}
   var kp=kq('[data-kkpost]');if(kp){e.stopPropagation();var pk=kp.getAttribute('data-kkpost');S.kkPost=S.kkPost||{};var cur=kp.classList.contains('on');S.kkPost[pk]=!cur;render();return;}
+  if(kq('#kkmq-x')){e.stopPropagation();S.kkMemQ='';render();return;}
   if(kq('#kk-backup')){e.stopPropagation();kkBackup();return;}
   if(kq('#kkmg-go')){e.stopPropagation();kkMergeAccounts();return;}
   var kl=kq('[data-kklink]');if(kl){e.stopPropagation();kkLinkSignup(kl.getAttribute('data-kklink'));return;}
@@ -1241,6 +1249,20 @@ function kkBackup(){
   document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove();},1000);
   showToast('💾 백업 파일을 저장했어요. 안전한 곳에 보관해 주세요','success');
 }
+function kkNorm(s){return String(s||'').replace(/\s+/g,'').toLowerCase().replace(/^@/,'');}
+function kkMemHit(m,q){return [m.name,m.momName,m.insta,memLoginId(m),m.oldNick].some(function(x){return kkNorm(x).indexOf(q)>=0;});}
+function kkMemSearchHtml(q,list){
+  var h='<div class="kk-msearch"><input class="ainp" type="search" id="kkmq" placeholder="🔍 멤버 찾기 (닉네임·아이디·인스타)" value="'+esc(S.kkMemQ||'')+'" autocomplete="off" autocapitalize="off" spellcheck="false">'+(q?'<button class="abtn sec sm" id="kkmq-x">지우기</button>':'')+'</div>';
+  if(!q)return h;
+  var nw=list.filter(kkIsNewMem).length,old=list.length-nw;
+  var pend=Object.values(S.signups||{}).filter(function(su){return [su.name,su.momName,su.insta,su.loginId,su.oldNick].some(function(x){return kkNorm(x).indexOf(q)>=0;});});
+  h+='<div class="kk-msres"><b>검색 결과 '+(list.length+pend.length)+'명</b> · 👥 멤버관리 '+nw+'명 · 🗂️ 과거 멤버 '+old+'명'+(pend.length?' · 🙋 가입 대기 '+pend.length+'명':'')+'</div>';
+  list.forEach(function(m){h+='<div class="kk-msrow"><span class="kk-mstag '+(kkIsNewMem(m)?'new':'old')+'">'+(kkIsNewMem(m)?'멤버관리':'과거 멤버')+'</span><b>'+esc(m.name)+'</b> <span style="color:var(--mu)">'+esc(memLoginId(m))+' · '+esc(tierOf(memTier(m)).label)+' · 스터디 '+(m.studyIds||[]).length+'개</span></div>';});
+  pend.forEach(function(su){h+='<div class="kk-msrow"><span class="kk-mstag pend">가입 대기</span><b>'+esc(su.name)+'</b> <span style="color:var(--mu)">'+esc(su.loginId)+' · 아직 승인 전</span></div>';});
+  if(!list.length&&!pend.length)h+='<div class="kk-msrow" style="color:var(--mu)">찾는 멤버가 없어요. 가입 신청이 저장되지 않았거나 명단에서 빠졌을 수 있어요.</div>';
+  return h;
+}
+document.addEventListener('input',function(e){if(e.target&&e.target.id==='kkmq'){var v=e.target.value,p=e.target.selectionStart;S.kkMemQ=v;render();var n=document.getElementById('kkmq');if(n){n.focus();try{n.setSelectionRange(p,p);}catch(x){}}}},true);
 function rML(){
   return '<div class="login-wrap"><div class="login-box"><h2>👋 로그인</h2>'+
     '<p>아이디와 비밀번호를 입력해주세요</p>'+
@@ -3470,7 +3492,8 @@ function rST(){
   }
 
   if(S.settingsTab==='member'||S.settingsTab==='oldmem'){
-    var kkOld=S.settingsTab==='oldmem',kkML=S.members.filter(function(m){return kkOld?!kkIsNewMem(m):kkIsNewMem(m);});
+    var kkOld=S.settingsTab==='oldmem',kkQ=kkNorm(S.kkMemQ||''),kkML=kkQ?S.members.filter(function(m){return kkMemHit(m,kkQ);}):S.members.filter(function(m){return kkOld?!kkIsNewMem(m):kkIsNewMem(m);});
+    h+=kkMemSearchHtml(kkQ,kkML);
     if(kkOld)h+='<div class="kk-hint" style="margin:0 2px">예전 VIP·NEW 사이트에서 가져온 뒤 아직 다시 가입·연결되지 않은 멤버예요. 다시 가입해서 연결되면 멤버관리로 옮겨가요.</div>'+kkMergeHtml();
     else h+='<div class="kk-hint" style="margin:0 2px">새로 가입해서 승인된 멤버만 보여요. 가져온 기존 멤버는 🗂️ 과거 멤버 탭에 있어요.</div>'+kkAdminExtraHtml()+kkMergeHtml();
     var pend=kkOld?[]:Object.values(S.signups||{}).sort(function(a,b){return a.createdAt-b.createdAt;});
