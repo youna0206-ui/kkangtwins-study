@@ -485,7 +485,7 @@ body.hv-mode #app{background:#FBF8F3}
 .hb-imgs.n1 img{max-height:110mm;object-fit:contain;background:#fff}
 @media print{
   @page{size:A4;margin:12mm}
-  html,body{height:auto!important;overflow:visible!important;background:#fff!important}
+  html,body{height:auto!important;min-height:0!important;overflow:visible!important;background:#fff!important}
   body.hv-printing{padding:0!important}
   body.hv-printing>*:not(#hv-book){display:none!important}
   body.hv-printing #hv-book{display:block!important;position:static;overflow:visible;background:#fff}
@@ -556,6 +556,37 @@ body.hv-mode #app{background:#FBF8F3}
 .hv-cmf .hv-ta{min-height:44px;flex:1}
 .hv-cmf .abtn{flex-shrink:0;padding:.7rem .9rem}
 .hv-nb{position:absolute;top:2px;left:calc(50% + 6px);min-width:17px;height:17px;border-radius:9px;background:#D9534F;color:#fff;font-size:10.5px;font-style:normal;font-weight:800;display:flex;align-items:center;justify-content:center;padding:0 4px}
+/* 🖨️ 질문지 */
+.hq-bar{flex-direction:column;align-items:center;gap:8px}
+.hq-row{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
+.hb-bar .hq-opt{background:transparent;color:#ddd;border:1px solid #888;font-size:12.5px;padding:.4rem .65rem}
+.hb-bar .hq-opt.on{background:#fff;color:#333;border-color:#fff}
+.hq-top{display:flex;gap:10px;align-items:flex-start;border-bottom:1.5px solid #3B5F52;padding-bottom:8px;margin-bottom:8px}
+.hq-top>div:first-child{flex:1;min-width:0}
+.hq-fill{flex-shrink:0;font-size:12px;color:#8A7C68;line-height:2.1;text-align:right}
+.hq-fill span,.hq-blank{display:inline-block;width:28mm;border-bottom:1px solid #B9A88E;margin-left:4px;vertical-align:-2px}
+.hq-meta{font-size:13px;color:#5B5048;margin-bottom:8px}
+.hq-guide{background:#F6EFE3;padding:9px 11px;font-size:12.5px;line-height:1.65;white-space:pre-wrap;margin-bottom:10px;break-inside:avoid}
+.hq-part{font-size:13px;font-weight:800;color:#3B5F52;margin:12px 0 6px;padding:3px 0;border-bottom:1px dashed #CDBFA8}
+.hq-part.nr{color:#3F7A57}
+.hq-q{margin-bottom:9px;break-inside:avoid}
+.hq-q .hb-qq{font-weight:700;color:#2F2B28;line-height:1.55}
+.hq-ln{height:8.5mm;border-bottom:1px dotted #B9A88E}
+.hq-foot{margin-top:14px;font-size:10.5px;color:#9A8B76;text-align:center}
+@media print{.hq-guide{background:#F6EFE3!important}}
+@media print{
+  .hq .hb-et{font-size:19px}
+  .hq-top{padding-bottom:5px;margin-bottom:6px}
+  .hq-guide{padding:6px 9px;font-size:11.5px;line-height:1.55;margin-bottom:6px}
+  .hq-part{margin:8px 0 4px}
+  .hq-q{margin-bottom:5px}
+  .hq-q .hb-qq{font-size:12.5px;line-height:1.5}
+  .hq-ln{height:7mm}
+  .hq-foot{margin-top:6px;font-size:9.5px}
+  .hq-meta{margin-bottom:4px}
+}
+.hq-meta{display:flex;justify-content:space-between;gap:8px;align-items:baseline;flex-wrap:wrap}
+.hq-tip{font-size:10.5px;color:#9A8B76}
 </style>
 </head>
 <body>
@@ -5214,7 +5245,7 @@ function rHvPlan(){
       (s.desc?'<div class="hv-sr-d">'+esc(s.desc)+'</div>':'')+
       '<div class="hv-sr-p">읽음 '+nRead+'/'+books.length+' · 일지 '+nWrite+'/'+books.length+'권</div><div class="hv-bar"><i style="width:'+(books.length?Math.round(nWrite/books.length*100):0)+'%"></i></div>'+
       '</div><span class="hv-ar">'+(open?'▲':'▼')+'</span></div>';
-    h+='<div style="padding:0 12px 12px;">'+hvNextBtn(s)+'</div>';
+    h+='<div style="padding:0 12px 12px;display:flex;flex-direction:column;gap:6px;">'+hvNextBtn(s)+'<button class="hv-sb" data-hv="qprintall" data-x="'+s.id+'">🖨️ 질문지 모아 인쇄 · PDF</button></div>';
     if(open){
       if(!books.length)h+='<div class="hv-bk"><div class="empty">책이 아직 없어요.</div></div>';
       var pw=+s.perWeek||0;
@@ -5260,7 +5291,8 @@ function rHvBookRow(s,b,i){
     '</div>';
   if(st.ob[b.id]){
     h+='<div class="hv-bk-x">'+(b.guide?'<div class="hv-gt">📘 부모 가이드</div><div class="hv-guide">'+hvGuideHtml(b.guide)+'</div>':'')+
-      (qs.length?'<div class="hv-gt">💬 대화 질문</div><ul class="hv-ql">'+qs.map(function(q,k){return '<li>'+hvQ(q,k+1)+'</li>';}).join('')+'</ul>':'<div class="hv-stat">등록된 질문이 아직 없어요.</div>')+'</div>';
+      (qs.length?'<div class="hv-gt">💬 대화 질문</div><ul class="hv-ql">'+qs.map(function(q,k){return '<li>'+hvQ(q,k+1)+'</li>';}).join('')+'</ul>'+
+        (hvCanWrite(s)?'<button class="hv-sb" data-hv="qprint" data-x="'+s.id+'" data-y="'+b.id+'" style="margin-top:8px;">🖨️ 이 책 질문지 인쇄 · PDF</button>':''):'<div class="hv-stat">등록된 질문이 아직 없어요.</div>')+'</div>';
   }
   return h+'</div>';
 }
@@ -5279,7 +5311,7 @@ function rHvShelf(){
       '<div class="hv-row"><input class="hv-in" id="hv-pb-'+s.id+'" placeholder="읽은 책 제목을 적고 바로 쓰기" maxlength="60"><button class="abtn" data-hv="pquick" data-x="'+s.id+'">✏️ 쓰기</button></div>'+
       (books.some(function(b){return !hvMyEntry(b.id,m.id);})?hvNextBtn(s):'')+'</div>';
     if(open)books.forEach(function(b,i){h+=rHvBookRow(s,b,i);});
-    h+='<div style="padding:10px 12px;border-top:1px solid var(--br);"><button class="hv-sb" data-hv="pedit" data-x="'+s.id+'">⚙️ 책장 편집 (책 목록·질문)</button></div></div>';
+    h+='<div style="padding:10px 12px;border-top:1px solid var(--br);"><button class="hv-sb" data-hv="pedit" data-x="'+s.id+'">⚙️ 책장 편집 (책 목록·질문)</button> '+(books.length?'<button class="hv-sb" data-hv="qprintall" data-x="'+s.id+'">🖨️ 질문지 인쇄</button>':'')+'</div></div>';
   });
   if(!list.length)h+='<div class="card empty">아직 만든 책장이 없어요.</div>';
   return h;
@@ -5426,7 +5458,8 @@ function rHvWrite(){
     h+='</div>';
   }
   h+='<div class="hv-fc"><div class="hv-hero-s" style="margin:0 0 2px;">'+esc(sname)+'</div><div class="hv-hero-t">'+esc(title)+'</div>'+
-    (b&&b.guide?'<details class="hv-gd"><summary>📘 부모 가이드 보기</summary><div class="hv-guide" style="margin:8px 0 0;">'+hvGuideHtml(b.guide)+'</div></details>':'')+'</div>';
+    (b&&b.guide?'<details class="hv-gd"><summary>📘 부모 가이드 보기</summary><div class="hv-guide" style="margin:8px 0 0;">'+hvGuideHtml(b.guide)+'</div></details>':'')+
+    (b&&hvBookQs(s,b).length?'<button class="hv-sb" data-hv="qprint" data-x="'+d.sid+'" data-y="'+d.bid+'" style="margin-top:10px;">🖨️ 질문지 인쇄 · PDF</button>':'')+'</div>';
   // 주인공 이름 (필수)
   h+='<div class="hv-fc hv-req'+(S.hvHeroErr?' err':'')+'"><div class="hv-fl">🦸 주인공 이름 <span class="hv-must">필수</span></div>'+
     '<input class="hv-in" id="hv-hero" data-hvt="hero" value="'+esc(d.hero||'')+'" placeholder="예: 나나, 올리, 아기 곰" maxlength="20">'+
@@ -5870,7 +5903,59 @@ async function hvMakeBook(){
   el.innerHTML=h;el.style.display='block';el.scrollTop=0;
   document.body.classList.add('hv-printing');
 }
-function hvCloseBook(){var el=document.getElementById('hv-book');if(el){el.style.display='none';el.innerHTML='';}document.body.classList.remove('hv-printing');}
+// ── 🖨️ 질문지 (대화 전에 인쇄해서 보는 용) ──
+function hvOpenQSheet(sid,bids){
+  var s=HV.series[sid];if(!s||!hvCanWrite(s))return;
+  var all=hvBooks(s);
+  var m=hvMe(),rng='all';
+  if(!bids){var nx=m?hvNext(s,m.id):null;rng=nx?'next':'all';}
+  S.hvQS={sid:sid,bids:bids||null,rng:bids?'one':rng,guide:true,lines:1};
+  hvRenderQSheet();
+}
+function hvRenderQSheet(){
+  var o=S.hvQS;if(!o)return;var s=HV.series[o.sid];if(!s)return;var m=hvMe();
+  var all=hvBooks(s),order={};all.forEach(function(b,i){order[b.id]=i;});
+  var list;
+  if(o.rng==='one')list=all.filter(function(b){return o.bids.indexOf(b.id)>=0;});
+  else if(o.rng==='next'){var st0=m?hvNext(s,m.id):null;var i0=st0?st0.i:0;list=all.slice(i0,i0+3);}
+  else if(o.rng==='left')list=all.filter(function(b){return !(m&&hvMyEntry(b.id,m.id));});
+  else list=all;
+  list=list.filter(function(b){return hvBookQs(s,b).length;});
+  var kids=m?hvKids(m.id).map(function(k){return k.name;}):[];
+  var chip=function(k,label,on){return '<button class="hq-opt'+(on?' on':'')+'" data-hv="qsopt" data-x="'+k+'">'+(on?'✓ ':'')+label+'</button>';};
+  var h='<div class="hb-bar hq-bar"><div class="hq-row"><button data-hv="bprint" class="hb-pr">🖨️ 인쇄 · PDF 저장</button><button data-hv="bclose">닫기</button></div><div class="hq-row">'+
+    (o.rng!=='one'?chip('r_next','다음 3권',o.rng==='next')+chip('r_left','안 쓴 책 전부',o.rng==='left')+chip('r_all','전체 '+all.length+'권',o.rng==='all'):'')+
+    chip('guide','부모 가이드',o.guide)+chip('l0','답 칸 없음',!o.lines)+chip('l1','답 칸 1줄 (한 장)',o.lines===1)+chip('l2','답 칸 2줄',o.lines===2)+'</div></div><div class="hb-pages">';
+  if(!list.length)h+='<section class="hb-page"><div class="hb-em" style="border:none;">인쇄할 질문이 없어요.</div></section>';
+  list.forEach(function(b){
+    var qs=hvBookQs(s,b),hero=b.hero||'';
+    var fix=function(q){return hero?String(q).replace(/주인공/g,hero):q;};
+    var lines=new Array((o.lines||0)+1).join('<div class="hq-ln"></div>');
+    var groups=[[],[],[],[]],hasStage=qs.some(function(q){return HV_STAGE[hvLab(q).lab];});
+    qs.forEach(function(q,qi){groups[hasStage?hvStage(q):2].push({q:fix(q),n:qi+1});});
+    h+='<section class="hb-page hq"><div class="hq-top"><div><div class="hb-no">'+esc(s.name)+' · No. '+('0'+(order[b.id]+1)).slice(-2)+(b.tag?' · '+esc(b.tag):'')+'</div>'+
+      '<div class="hb-et">'+esc(b.title)+'</div></div><div class="hq-fill">날짜 <span></span><br>'+(kids.length?esc(kids.join(' · ')):'아이')+' <span></span></div></div>'+
+      '<div class="hq-meta"><span>🦸 주인공: '+(hero?'<b>'+esc(hero)+'</b>':'<span class="hq-blank"></span>')+'</span><span class="hq-tip">대화 후 독후일지에 옮겨 적어 주세요 · 강둥이네와 함께</span></div>';
+    if(o.guide&&b.guide)h+='<div class="hq-guide">'+hvGuideHtml(b.guide)+'</div>';
+    [1,2,3,0].forEach(function(st){
+      if(!groups[st].length)return;
+      if(hasStage)h+='<div class="hq-part'+(st===0?' nr':'')+'">'+(st?['','①','②','③'][st]+' '+HV_PART[st]:'🌈 누리과정 확장 · 놀이로 넓혀요')+'</div>';
+      groups[st].forEach(function(x){
+        h+='<div class="hq-q"><div class="hb-qq">'+hvQ(x.q,x.n)+'</div>'+lines+'</div>';
+      });
+    });
+    if(o.lines)h+='<div class="hq-q"><div class="hb-qq">💬 질문 밖에서 나눈 대화</div>'+lines+'</div>'+
+      '<div class="hq-q"><div class="hb-qq">🌿 엄마의 생각 노트</div>'+lines+'</div>';
+    h+='</section>';
+  });
+  h+='</div>';
+  var el=document.getElementById('hv-book');
+  if(!el){el=document.createElement('div');el.id='hv-book';document.body.appendChild(el);}
+  var keep=el.style.display==='block'?el.scrollTop:0;
+  el.innerHTML=h;el.style.display='block';el.scrollTop=keep;
+  document.body.classList.add('hv-printing');
+}
+function hvCloseBook(){S.hvQS=null;var el=document.getElementById('hv-book');if(el){el.style.display='none';el.innerHTML='';}document.body.classList.remove('hv-printing');}
 
 // ── 이벤트 ──
 document.addEventListener('click',function(e){
@@ -5990,6 +6075,9 @@ document.addEventListener('click',function(e){
   if(a==='bmake'){hvMakeBook();return;}
   if(a==='bprint'){window.print();return;}
   if(a==='bclose'){hvCloseBook();return;}
+  if(a==='qprint'){hvOpenQSheet(x,[y]);return;}
+  if(a==='qprintall'){hvOpenQSheet(x,null);return;}
+  if(a==='qsopt'&&S.hvQS){var q0=S.hvQS;if(x==='guide')q0.guide=!q0.guide;else if(/^l\d$/.test(x))q0.lines=+x.slice(1);else q0.rng=x.slice(2);hvRenderQSheet();return;}
   if(a==='flush'){hvFlush();showToast('다시 저장하는 중…','info');return;}
   if(a==='pick'){S.hvPick=!S.hvPick;render();return;}
   if(a==='essay'){S.hvEssayOpen=true;render();return;}
