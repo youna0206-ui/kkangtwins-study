@@ -604,6 +604,8 @@ body.hv-mode #app{background:#FBF8F3}
 .hq-pi{display:flex;align-items:center;gap:8px;width:100%;border:none;border-bottom:1px solid #eee;background:#fff;padding:8px 10px;font-size:13.5px;text-align:left;cursor:pointer;color:#333}
 .hq-pi small{color:#9CA3AF;font-size:11px}
 .hq-pi.w:not(.on){color:#A3A3A3}
+.hv-more{width:100%;padding:.8rem;font-size:14px}
+.hv-bk-warn{border-color:#E9B9B3;background:#FFFAF8}
 </style>
 </head>
 <body>
@@ -4995,22 +4997,105 @@ var HV_PRESETS={lili:{"key": "lili", "name": "리리의 이야기 숲 하브루�
 // 사이트 이름: 여기만 바꾸면 헤더·하단 메뉴에 모두 반영돼요
 var HV_NAME='하브루타 독후일지',HV_SHORT='독후일지';
 var HV_BRAND='@kkang_twins_ 강둥맘';
+// 사진 올리기: 저장 공간을 아끼려고 꺼 둠 (true로 바꾸면 다시 켜짐)
+var HV_PHOTOS=false;
 var HV_PATH=DB_PATH.replace('.json','_hav');
 var HV_IMG=DB_PATH.replace('.json','_havimg');
 var HV={loaded:false,loading:false,err:'',series:{},entries:{},reads:{},kids:{},apps:{},cmts:{},imgs:{},imgLoading:{}};
-function hvReq(p,method,body){
+function hvReq(p,method,body,qs){
   var o={method:method||'GET'};
   if(body!==undefined){o.headers={'Content-Type':'application/json'};o.body=JSON.stringify(body);}
-  return fetch(FIREBASE_URL+p+'.json',o).then(function(r){if(!r.ok)throw new Error(r.status);return r.json();});
+  return fetch(FIREBASE_URL+p+'.json'+(qs?'?'+qs:''),o).then(function(r){
+    if(!r.ok)return r.text().then(function(t){var er=new Error(r.status);er.body=t||'';throw er;});
+    return r.json();});
 }
-function hvLoad(force){
+// ── 필요한 것만 불러오기 (Firebase 색인 사용) ──
+var HV_FEED_FIRST=3,HV_FEED_MORE=5;
+function hvQs(o){return Object.keys(o).map(function(k){return k+'='+encodeURIComponent(JSON.stringify(o[k]));}).join('&');}
+function hvIsIdxErr(er){return er&&er.message==='400'&&/index/i.test(er.body||'');}
+// 색인이 없으면 전체를 받아 걸러서라도 동작하게 (느리지만 안전)
+function hvQuery(p,q,filter){
+  return hvReq(p,'GET',undefined,hvQs(q)).catch(function(er){
+    if(!hvIsIdxErr(er))throw er;
+    HV.noIndex=true;
+    return hvReq(p).then(function(all){var o={};Object.keys(all||{}).forEach(function(k){if(all[k]&&filter(all[k]))o[k]=all[k];});return o;});
+  });
+}
+function hvSeriesPath(sx){return (sx&&sx.owner&&sx._src!=='series')?HV_PATH+'/shelves/'+sx.owner+'/'+sx.id:HV_PATH+'/series/'+(sx&&sx.id);}
+async function hvLoad(force){
   if(HV.loading||(HV.loaded&&!force))return;
   HV.loading=true;HV.err='';
-  hvReq(HV_PATH).then(function(d){
-    d=d||{};HV.series=d.series||{};HV.entries=d.entries||{};HV.reads=d.reads||{};HV.kids=d.kids||{};HV.apps=d.apps||{};HV.cmts=d.cmts||{};HV.loaded=true;hvOutboxMerge();setTimeout(hvFlush,500);
-  }).catch(function(e){HV.err='불러오지 못했어요 ('+e.message+')';}).then(function(){
-    HV.loading=false;if(S.tab==='hav'&&!S.home)render();
-  });
+  var m=hvMe(),mid=m&&m.id;
+  try{
+    var r=await Promise.all([
+      hvReq(HV_PATH+'/series'),hvReq(HV_PATH+'/apps'),hvReq(HV_PATH+'/meta'),
+      mid?hvReq(HV_PATH+'/shelves/'+mid):null,mid?hvReq(HV_PATH+'/kids/'+mid):null,
+      mid?hvReq(HV_PATH+'/readsBy/'+mid):null,mid?hvReq(HV_PATH+'/noti/'+mid):null,
+      mid?hvQuery(HV_PATH+'/entries',{orderBy:'mid',equalTo:mid},function(e){return e.mid===mid;}):null
+    ]);
+    var ser={};
+    Object.keys(r[0]||{}).forEach(function(k){var x=r[0][k];if(!x)return;if(x.owner){if(x.owner!==mid)return;x._src='series';}ser[k]=x;});
+    Object.keys(r[3]||{}).forEach(function(k){var x=r[3][k];if(x){x.owner=mid;ser[k]=x;}});
+    HV.series=ser;HV.apps=r[1]||{};HV.meta=r[2]||{};
+    HV.kids={};if(mid)HV.kids[mid]=r[4]||{};
+    HV.reads={};Object.keys(r[5]||{}).forEach(function(b){HV.reads[b+'__'+mid]=r[5][b];});
+    HV.noti=r[6]||{};HV.entries=r[7]||{};HV.cmts={};HV.feed=null;HV.allLoaded=false;
+    HV.loaded=true;hvOutboxMerge();setTimeout(hvFlush,500);
+  }catch(e){HV.err='불러오지 못했어요 ('+e.message+')';}
+  HV.loading=false;if(S.tab==='hav'&&!S.home)render();
+}
+// 강둥맘 관리 화면에서만: 통계용 전체 불러오기
+async function hvLoadAll(){
+  if(HV.allLoading||HV.allLoaded)return;HV.allLoading=true;
+  try{
+    var r=await Promise.all([hvReq(HV_PATH+'/entries'),hvReq(HV_PATH+'/readsBy'),hvReq(HV_PATH+'/reads')]);
+    var mine=HV.entries;HV.entries=r[0]||{};Object.keys(mine).forEach(function(k){if(mine[k]&&mine[k]._pending)HV.entries[k]=mine[k];});
+    Object.keys(r[1]||{}).forEach(function(mid){Object.keys(r[1][mid]||{}).forEach(function(b){HV.reads[b+'__'+mid]=r[1][mid][b];});});
+    Object.keys(r[2]||{}).forEach(function(k){HV.reads[k]=r[2][k];});
+    HV.allLoaded=true;
+    // 예전 구조 데이터 한 번만 정리: 공개 일지에 피드 색인 필드 넣기, 예전 읽음 기록 옮기기
+    if(!(HV.meta&&HV.meta.v>=2)){
+      var jobs=[];
+      Object.keys(HV.entries).forEach(function(k){var e=HV.entries[k];if(!e||!e.mid||e._pending)return;
+        if(e.pub&&!e.feedAt){var t=e.updatedAt||e.createdAt||Date.now();e.feedAt=t;e.sidFeed=e.sid+'_'+t;jobs.push(hvReq(HV_PATH+'/entries/'+k,'PATCH',{feedAt:t,sidFeed:e.sidFeed}));}});
+      var by={};Object.keys(r[2]||{}).forEach(function(k){var i=k.lastIndexOf('__');if(i<0)return;var b=k.slice(0,i),mid=k.slice(i+2);(by[mid]=by[mid]||{})[b]=r[2][k];});
+      Object.keys(by).forEach(function(mid){jobs.push(hvReq(HV_PATH+'/readsBy/'+mid,'PATCH',by[mid]));});
+      await Promise.all(jobs);
+      if(Object.keys(by).length)await hvReq(HV_PATH+'/reads','DELETE');
+      await hvReq(HV_PATH+'/meta/v','PUT',2);HV.meta=HV.meta||{};HV.meta.v=2;
+    }
+  }catch(e){showToast('관리 통계를 불러오지 못했어요 ('+e.message+')','cancel');}
+  HV.allLoading=false;if(S.tab==='hav')render();
+}
+// 함께 보기: 최근 것부터 조금씩
+async function hvFeedLoad(more){
+  var st=hvSt(),sid=st.ff||'';
+  if(!more||!HV.feed||HV.feed.sid!==sid)HV.feed={sid:sid,ids:[],oldest:null,done:false,busy:false};
+  var F=HV.feed;if(F.busy||F.done)return;F.busy=true;render();
+  var want=F.ids.length?HV_FEED_MORE:HV_FEED_FIRST,got=0,tries=0;
+  var vis={};hvSeriesList().forEach(function(x){vis[x.id]=1;});
+  try{
+    while(got<want&&!F.done&&tries<4){
+      tries++;var lim=want-got+2,res;
+      if(sid){var end=sid+'_'+(F.oldest?String(F.oldest-1):'9999999999999');
+        res=await hvQuery(HV_PATH+'/entries',{orderBy:'sidFeed',startAt:sid+'_',endAt:end,limitToLast:lim},function(e){return e.sidFeed&&e.sidFeed.indexOf(sid+'_')===0&&e.sidFeed<=end;});}
+      else res=await hvQuery(HV_PATH+'/entries',{orderBy:'feedAt',startAt:1,endAt:F.oldest?F.oldest-1:9999999999999,limitToLast:lim},function(e){return e.feedAt&&(!F.oldest||e.feedAt<F.oldest);});
+      var arr=Object.keys(res||{}).map(function(k){var e=res[k];if(e)e.id=e.id||k;return e;}).filter(Boolean).sort(function(a,b){return (b.feedAt||0)-(a.feedAt||0);});
+      if(HV.noIndex)arr=arr.slice(0,lim);
+      var used=0;
+      for(var ai=0;ai<arr.length;ai++){
+        if(got>=want)break;
+        var e=arr[ai];used++;
+        var prev=HV.entries[e.id];if(!(prev&&prev._pending))HV.entries[e.id]=e;
+        F.oldest=Math.min(F.oldest||Infinity,e.feedAt||Infinity);
+        var sx=HV.series[e.sid],ok=e.pub&&(vis[e.sid]||!sx||sx.owner||hvAdm());
+        if(ok&&F.ids.indexOf(e.id)<0){F.ids.push(e.id);got++;}
+      }
+      // 받은 것을 다 썼고 요청보다 적게 왔으면 끝
+      if(used===arr.length&&arr.length<lim)F.done=true;
+    }
+  }catch(e){showToast('함께 보기를 불러오지 못했어요 ('+e.message+')','cancel');F.done=false;}
+  F.busy=false;render();
 }
 function hvSt(){if(!S.hv)S.hv={v:'plan',open:{},ob:{},oe:{},ff:''};return S.hv;}
 function hvMe(){return curLoggedMember();}
@@ -5089,18 +5174,22 @@ function rHvRx(e){
 }
 
 // ══ 💬 댓글: /cmts/{일지id}/{댓글id} ══
+function hvLoadCmts(eid){
+  if(HV.cmts[eid]!==undefined||(HV.cmLoading||{})[eid])return;HV.cmLoading=HV.cmLoading||{};HV.cmLoading[eid]=1;
+  hvReq(HV_PATH+'/cmts/'+eid).then(function(d){HV.cmts[eid]=d||{};}).catch(function(){}).then(function(){delete HV.cmLoading[eid];if(S.tab==='hav')render();});
+}
+function hvCmtN(e){return HV.cmts[e.id]!==undefined?hvCmts(e.id).length:(e.ncm||0);}
 function hvCmts(eid){var o=HV.cmts[eid]||{};return Object.keys(o).map(function(k){var c=o[k];if(c)c.id=k;return c;}).filter(function(c){return c&&c.text;}).sort(function(a,b){return (a.at||0)-(b.at||0);});}
+// 댓글 수는 일지에 숫자로만 기록 (목록에서 댓글 전체를 안 받아도 되게)
+function hvCmtCount(eid){var n=hvCmts(eid).length,e=HV.entries[eid];if(e)e.ncm=n;hvReq(HV_PATH+'/entries/'+eid+'/ncm','PUT',n||null).catch(function(){});}
 function hvAgo(t){var d=(Date.now()-t)/60000;if(d<1)return '방금';if(d<60)return Math.floor(d)+'분 전';if(d<1440)return Math.floor(d/60)+'시간 전';if(d<10080)return Math.floor(d/1440)+'일 전';var x=new Date(t);return (x.getMonth()+1)+'/'+x.getDate();}
 function hvSeenKey(){var m=hvMe();return 'kk_hv_cmseen_'+(m?m.id:'');}
 function hvSeenAt(){try{return +localStorage.getItem(hvSeenKey())||0;}catch(e){return 0;}}
-function hvNewCmts(){
-  var m=hvMe();if(!m)return [];var seen=hvSeenAt(),out=[];
-  Object.keys(HV.cmts).forEach(function(eid){var e=HV.entries[eid];if(!e||e.mid!==m.id)return;
-    hvCmts(eid).forEach(function(c){if(c.mid!==m.id&&(c.at||0)>seen)out.push(c.id);});});
-  return out;
-}
+function hvNewCmts(){return Object.keys(HV.noti||{}).filter(function(k){return HV.noti[k];});}
 function rHvCmts(e){
-  var m=hvMe(),adm=hvAdm(),list=hvCmts(e.id),fresh=S.hvFresh||{};
+  var m=hvMe(),adm=hvAdm(),fresh=S.hvFresh||{};
+  if(HV.cmts[e.id]===undefined){hvLoadCmts(e.id);return '<div class="hv-cm"><div class="hv-stat">💬 댓글 불러오는 중…</div></div>';}
+  var list=hvCmts(e.id);
   var h='<div class="hv-cm"><div class="hv-blk-t">💬 댓글 '+(list.length||'')+'</div>';
   list.forEach(function(c){
     var canDel=m&&(c.mid===m.id||e.mid===m.id)||adm;
@@ -5347,7 +5436,7 @@ function rHvEntry(e,mode){
     (e.hero?' · 🦸 '+esc(e.hero):'')+(kids.length?' · 👧 '+esc(kids.join(', ')):'')+
     (mode==='mine'?' <span class="hv-tag">'+(e.pub?'🌏 공개':'🔒 나만')+'</span>':'')+
     (e._pending?' <span class="hv-tag" style="color:var(--rd);border-color:var(--rd);">⏳ 저장 대기</span>':'')+(e.wb?' <span class="hv-tag">워크북 ✓</span>':'')+(e.nimg?' <span class="hv-tag">📷 '+e.nimg+'</span>':'')+
-    (hvRxTotal(e)?' · 💗 '+hvRxTotal(e):'')+(hvCmts(e.id).length?' · 💬 '+hvCmts(e.id).length:'')+'</div>';
+    (hvRxTotal(e)?' · 💗 '+hvRxTotal(e):'')+(hvCmtN(e)?' · 💬 '+hvCmtN(e):'')+'</div>';
   if(!open){var pk=hvEssayKids(e)[0],pv=pk?hvEssayOf(e,pk):'';if(pv)h+='<div class="hv-en-pv">📄 '+esc(pv.split('\n')[0])+'</div>';else if(e.insight)h+='<div class="hv-en-pv">🌿 '+esc(e.insight)+'</div>';}
   h+='</div>';
   if(open){
@@ -5377,7 +5466,7 @@ function rHvEntry(e,mode){
       else h+='<div class="hv-imgs">'+im.filter(hvImgOk).map(function(src,i){return '<img src="'+src+'" alt="사진 '+(i+1)+'" data-hv="zoom" data-x="'+e.id+'" data-y="'+i+'">';}).join('')+'</div>';
     }
     if(e.pub)h+=rHvRx(e);
-    if(e.pub||hvCmts(e.id).length)h+=rHvCmts(e);
+    if(e.pub||hvCmtN(e))h+=rHvCmts(e);
     h+='<div class="hv-act">';
     if(mineE)h+='<button class="hv-sb" data-hv="epdf" data-x="'+e.id+'">📕 PDF</button><button class="hv-sb" data-hv="edit" data-x="'+e.id+'">✏️ 수정</button><button class="hv-sb del" data-hv="edel" data-x="'+e.id+'">삭제</button>';
     else if(adm&&mode==='feed')h+='<button class="hv-sb del" data-hv="edel" data-x="'+e.id+'">🛡️ 관리자 삭제</button>';
@@ -5400,7 +5489,7 @@ function rHvMine(){
   if(!list.length)return hvSeriesList().filter(hvCanWrite).map(hvNextBtn).join('')+'<div class="card empty">아직 쓴 일지가 없어요.<br>📅 읽기 일정에서 책을 골라 ✏️ 일지 쓰기를 눌러주세요.</div>';
   var nf=Object.keys(S.hvFresh||{}).length;
   var h=(nf?'<div class="hv-flow">💬 내 일지에 <b>새 댓글 '+nf+'개</b>가 달렸어요. 아래에 펼쳐 두었어요.</div>':'')+hvSeriesList().filter(hvCanWrite).map(hvNextBtn).join('');
-  h+='<button class="hv-preset" data-hv="v" data-x="book"><b>📕 일지 모아 책 만들기 (PDF)</b><span>표지 · 차례 · 책마다 한 쪽씩, 사진까지 예쁘게 묶어요</span></button>';
+  h+='<button class="hv-preset" data-hv="v" data-x="book"><b>📕 일지 모아 책 만들기 (PDF)</b><span>표지 · 차례 · 책마다 한 쪽씩 예쁘게 묶어요</span></button>';
   h+='<div class="hv-stat" style="padding:0 2px;">총 '+list.length+'권 기록 · 공개 '+list.filter(function(e){return e.pub;}).length+'권</div>';
   list.forEach(function(e){h+=rHvEntry(e,'mine');});
   return h;
@@ -5408,15 +5497,16 @@ function rHvMine(){
 
 // ── 👀 함께 보기 ──
 function rHvFeed(){
-  var st=hvSt(),ss=hvSeriesList(),ssF=hvOfficial();
-  var vis={};ss.forEach(function(s){vis[s.id]=1;});
-  var list=Object.keys(HV.entries).map(function(k){return HV.entries[k];}).filter(function(e){
-    var sx=HV.series[e.sid];
-    return e&&e.pub&&(vis[e.sid]||(sx&&sx.owner)||hvAdm())&&(!st.ff||e.sid===st.ff);
-  }).sort(function(a,b){return (b.updatedAt||0)-(a.updatedAt||0);});
+  var st=hvSt(),ssF=hvOfficial();
   var h='<select class="hv-sel" data-hvsel="ff"><option value="">전체 보기</option>'+ssF.map(function(s){return '<option value="'+s.id+'"'+(st.ff===s.id?' selected':'')+'>'+esc(s.name)+'</option>';}).join('')+'</select>';
+  var F=HV.feed;
+  if(!F||F.sid!==(st.ff||'')){setTimeout(function(){hvFeedLoad(false);},0);return h+'<div class="loading"><div class="sp"></div>불러오는 중...</div>';}
+  var list=F.ids.map(function(id){return HV.entries[id];}).filter(function(e){return e&&e.pub;});
+  if(!list.length&&F.busy)return h+'<div class="loading"><div class="sp"></div>불러오는 중...</div>';
   if(!list.length)return h+'<div class="card empty">아직 공개된 일지가 없어요.<br>첫 번째로 나눠주세요 🍀</div>';
   list.forEach(function(e){h+=rHvEntry(e,'feed');});
+  if(!F.done)h+='<button class="hv-sb hv-more" data-hv="fmore"'+(F.busy?' disabled':'')+'>'+(F.busy?'불러오는 중…':'⌄ 더 보기')+'</button>';
+  else h+='<div class="hv-stat" style="text-align:center;padding:6px;">모든 일지를 다 봤어요 🍀</div>';
   return h;
 }
 
@@ -5528,7 +5618,8 @@ function rHvWrite(){
   // 확장
   h+='<div class="hv-fc"><div class="hv-fl">🌿 엄마의 생각 노트</div><div class="hv-fh">대화하며 새로 알게 된 아이의 모습, 생활로 이어갈 놀이, 다음에 다시 물어볼 질문</div>'+
     '<textarea class="hv-ta" style="min-height:96px;" data-hvt="insight">'+esc(d.insight||'')+'</textarea></div>';
-  // 사진
+  // 사진 (HV_PHOTOS가 꺼져 있으면 숨김)
+  if(HV_PHOTOS){
   h+='<div class="hv-fc"><div class="hv-fl">📷 사진 <span class="hv-stat">(최대 3장 · 워크북, 책 읽는 모습)</span></div>';
   if(d.imgs===null)h+='<div class="hv-stat">사진 불러오는 중...</div>';
   else{
@@ -5537,6 +5628,7 @@ function rHvWrite(){
     h+='</div>';
   }
   h+='</div>';
+  }
   // 공개
   h+='<div class="hv-fc"><div class="hv-fl">공개 범위</div><div class="hv-pick">'+
     '<button class="'+(d.pub?'on':'')+'" data-hv="pub" data-x="1">🌏 함께 보기에 공개<small>다른 엄마들도 볼 수 있어요</small></button>'+
@@ -5559,13 +5651,13 @@ async function hvPush(job){
   ['kids','ans','talk','essay'].forEach(function(f){if(!body[f]||!Object.keys(body[f]).length)body[f]=null;});
   if(!body.hero)body.hero=null;
   if(!body.qs||!body.qs.length)body.qs=null;
-  delete body.likes;delete body.rx;
+  delete body.likes;delete body.rx;delete body.ncm;delete body._pending;
   await hvReq(HV_PATH+'/entries/'+e.id,'PATCH',body);
   if(job.imgsChanged){
     if(job.imgs&&job.imgs.length){var io={};job.imgs.forEach(function(src,i){io['p'+i]=src;});await hvReq(HV_IMG+'/'+e.id,'PUT',io);}
     else if(!job.isNew)await hvReq(HV_IMG+'/'+e.id,'DELETE');
   }
-  if(job.rk){var rp={};rp[job.rk]=e.date;await hvReq(HV_PATH+'/reads','PATCH',rp);HV.reads[job.rk]=e.date;}
+  if(job.rk){await hvReq(HV_PATH+'/readsBy/'+e.mid+'/'+job.rk.split('__')[0],'PUT',e.date);HV.reads[job.rk]=e.date;}
   // 저장 확인: 서버에 실제로 들어갔는지 다시 읽어 봄
   var chk=await hvReq(HV_PATH+'/entries/'+e.id+'/updatedAt');
   if(!(chk>=e.updatedAt))throw new Error('확인 실패');
@@ -5646,6 +5738,8 @@ async function hvSave(){
     btitle:(b&&b.title)||d.btitle||'',sname:(s&&s.name)||d.sname||'',date:d.date||hvToday(),
     kids:kmap,qs:d.qs||[],ans:ans,talk:talk,essay:(function(){var o={};Object.keys(d.essay||{}).forEach(function(k){if(d.essayEd&&d.essayEd[k]&&(d.essay[k]||'').trim()&&(k==='k0'||k==='all'||d.ks[k]))o[k]=d.essay[k].trim();});return o;})(),hero:(d.hero||'').trim(),insight:(d.insight||'').trim(),wb:!!d.wb,pub:!!d.pub,
     nimg:(d.imgs||[]).length,createdAt:d.createdAt||Date.now(),updatedAt:Date.now()};
+  e.feedAt=e.pub?e.updatedAt:null;e.sidFeed=e.pub?e.sid+'_'+e.updatedAt:null;
+  var pe=HV.entries[e.id];if(pe&&pe.ncm)e.ncm=pe.ncm;
   if(!(d.hero||'').trim()){S.hvHeroErr=true;render();showToast('주인공 이름을 적어 주세요','cancel');var hi=g('hv-hero');if(hi){hi.scrollIntoView({block:'center'});hi.focus();}return;}
   S.hvHeroErr=false;
   if(!hvHasText(e)&&!e.nimg){showToast('대화 내용을 한 줄 이상 적어주세요','cancel');return;}
@@ -5662,8 +5756,9 @@ async function hvSave(){
   try{localStorage.removeItem(hvDraftKey(d));localStorage.removeItem('kk_hv_draft_'+e.bid);}catch(er){}
   if(saved&&s&&s.owner&&m&&s.owner===m.id&&b&&!b.hero){
     var bi=(s.books||[]).indexOf(b);
-    if(bi>=0)hvReq(HV_PATH+'/series/'+s.id+'/books/'+bi+'/hero','PUT',e.hero).then(function(){b.hero=e.hero;}).catch(function(){});
+    if(bi>=0)hvReq(hvSeriesPath(s)+'/books/'+bi+'/hero','PUT',e.hero).then(function(){b.hero=e.hero;}).catch(function(){});
   }
+  if(HV.feed){var fi=HV.feed.ids.indexOf(e.id);if(fi>=0)HV.feed.ids.splice(fi,1);if(e.pub&&(!HV.feed.sid||HV.feed.sid===e.sid))HV.feed.ids.unshift(e.id);}
   if(saved){
     showToast(d.id?'수정했어요':'일지를 저장했어요 📖','success');
   } else {
@@ -5686,7 +5781,10 @@ function hvSeriesStats(s){
 }
 function rHvAdmin(){
   var list=hvOfficial(),st=hvSt();
-  var h='<button class="abtn" data-hv="snew" style="width:100%;">+ 새 전집 일정 만들기</button>';
+  if(!HV.allLoaded){setTimeout(hvLoadAll,0);}
+  var h0=HV.noIndex?'<div class="hv-warn">⚠️ Firebase 색인(.indexOn) 설정이 아직 안 되어 있어요. 지금은 전체를 받아서 걸러 쓰는 중이라 느릴 수 있어요. 안내대로 규칙을 적용해 주세요.</div>':'';
+  if(!HV.allLoaded)h0+='<div class="hv-stat" style="padding:0 2px;">📊 통계 불러오는 중…</div>';
+  var h=h0+'<button class="abtn" data-hv="snew" style="width:100%;">+ 새 전집 일정 만들기</button>';
   Object.keys(HV_PRESETS).forEach(function(k){
     var p=HV_PRESETS[k],has=list.some(function(s){return s.preset===k;});
     h+='<button class="hv-preset" data-hv="spreset" data-x="'+k+'"><b>📚 '+esc(p.name)+'</b><span>'+p.books.length+'권 · '+(p.perWeek?'주 '+p.perWeek+'권 · ':'책 순서대로 · ')+'부모가이드·하브루타·누리과정 질문 포함'+(has?' · 이미 만들었어요':'')+'</span></button>';
@@ -5705,9 +5803,14 @@ function rHvAdmin(){
         return '<button class="hv-sb'+(w?' hv-sb-alert':'')+'" data-hv="aplist" data-x="'+s.id+'">👥 신청 '+(w?'대기 '+w+' · ':'')+'승인 '+o+'</button>';})()+'</div>'+
       (st.ap&&st.ap[s.id]?rHvAppList(s):'')+'</div>';
   });
+  var lb=(HV.meta&&HV.meta.lastBackup)||0,days=lb?Math.floor((Date.now()-lb)/86400000):null;
+  h+='<div class="card'+(days===null||days>=7?' hv-bk-warn':'')+'"><div class="hv-fl">🛟 백업</div>'+
+    '<div class="hv-stat" style="line-height:1.6;margin-bottom:8px;">'+(lb?'마지막 수동 백업: <b>'+(days===0?'오늘':days+'일 전')+'</b> ('+new Date(lb).toLocaleDateString('ko-KR')+')':'아직 수동 백업을 한 적이 없어요.')+
+    (days===null||days>=7?'<br>⚠️ 일주일에 한 번은 받아 두세요.':'')+'<br>스터디 인증 + 공지 + 독후일지 전체를 파일 하나(.json)로 받아요. 휴대폰보다 <b>PC에서 받아 드라이브에 보관</b>하는 걸 추천해요.</div>'+
+    '<button class="abtn" data-hv="backup" style="width:100%;"'+(S.hvBackingUp?' disabled':'')+'>'+(S.hvBackingUp?'백업 파일 만드는 중…':'💾 전체 백업 파일 받기')+'</button></div>';
   var us=hvUsage(),tot=us.img+us.txt,pc=Math.min(100,tot/(700*1048576)*100);
   h+='<div class="card"><div class="hv-fl">💾 독후일지 저장 공간</div><div class="hv-bar" style="height:8px;"><i style="width:'+pc.toFixed(1)+'%;'+(pc>80?'background:var(--rd)':'')+'"></i></div>'+
-    '<div class="hv-stat" style="margin-top:6px;line-height:1.6;">사진 '+us.n+'장 '+hvMB(us.img)+' + 글 '+hvMB(us.txt)+' = <b>'+hvMB(tot)+'</b> / 권장 한도 700MB<br>Firebase 무료 요금제 전체 한도는 1GB예요 (스터디 데이터 포함). 80%를 넘으면 사진 정리가 필요해요.</div></div>';
+    '<div class="hv-stat" style="margin-top:6px;line-height:1.6;">'+(us.img?'사진 '+hvMB(us.img)+' + ':'')+'글 '+hvMB(us.txt)+' = <b>'+hvMB(tot)+'</b> / 권장 한도 700MB<br>사진은 올리지 않아서 글만 저장돼요. 일지 1개는 약 5KB라 수만 개를 써도 넉넉해요.</div></div>';
   h+='<div class="hv-stat" style="padding:0 2px;line-height:1.6;">🔒 \'나만 보기\' 일지는 작성한 엄마만 볼 수 있어요. 관리 화면에서는 참여 수만 보여요.</div>';
   return h;
 }
@@ -5742,6 +5845,7 @@ function hvEditStartP(sid){
   var c=s?JSON.parse(JSON.stringify(s)):{id:hvId('sr'),name:'',desc:'',owner:m.id,active:true,books:[],qsDefault:HV_GENERIC.slice(),createdAt:Date.now()};
   c.books=(c.books||[]).map(function(b){b.qsText=(b.qs||[]).join('\n');delete b._i;return b;});
   c.qsDefText=(c.qsDefault||[]).join('\n');
+  if(s&&s._src)c._src=s._src;
   c._new=!s;S.hvEdit=c;hvSt().v='sedit';render();window.scrollTo(0,0);
 }
 function hvEditStart(sid,presetKey){
@@ -5757,6 +5861,7 @@ function hvEditStart(sid,presetKey){
 }
 function rHvSeriesEdit(){
   var c=S.hvEdit;if(!c){hvSt().v='admin';return rHvAdmin();}
+  if(!c.owner&&!HV.allLoaded)setTimeout(hvLoadAll,0);
   var cnt={},rd={};
   Object.keys(HV.entries).forEach(function(k){var e=HV.entries[k];if(e)cnt[e.bid]=(cnt[e.bid]||0)+1;});
   Object.keys(HV.reads).forEach(function(k){var b=k.split('__')[0];rd[b]=(rd[b]||0)+1;});
@@ -5832,7 +5937,10 @@ async function hvEditSave(){
   ['tagColors','preset','owner','tiers'].forEach(function(f){if(!out[f])delete out[f];});if(!out.qsDefault||!out.qsDefault.length)delete out.qsDefault;if(!out.perWeek)delete out.perWeek;if(!out.wb)delete out.wb;
   S.hvSaving=true;render();
   try{
-    await hvReq(HV_PATH+'/series/'+out.id,'PUT',out);
+    if(c._src)out._src=c._src;
+    var outBody={};for(var ok2 in out)if(ok2.charAt(0)!=='_'&&!(c.owner&&!c._src&&ok2==='owner'))outBody[ok2]=out[ok2];
+    if(c.owner&&!c._src)outBody.owner=c.owner;
+    await hvReq(hvSeriesPath(out),'PUT',outBody);
     HV.series[out.id]=out;S.hvEdit=null;hvSt().v=out.owner?'shelf':'admin';showToast('저장했어요','success');
   }catch(err){showToast('저장 실패 ('+err.message+')','cancel');}
   S.hvSaving=false;render();window.scrollTo(0,0);
@@ -5844,6 +5952,26 @@ async function hvMoveSeries(sid,dir){
   var patch={};list.forEach(function(s,k){s.order=k;patch[s.id+'/order']=k;});
   render();
   try{await hvReq(HV_PATH+'/series','PATCH',patch);}catch(e){showToast('순서 저장 실패','cancel');}
+}
+
+// ── 🛟 전체 백업 (JSON 파일로 내려받기) ──
+async function hvBackup(){
+  if(S.hvBackingUp)return;S.hvBackingUp=true;render();
+  try{
+    var core=DB_PATH.replace('.json',''),r=await Promise.all([hvReq(core),hvReq(core+'_notices'),hvReq(HV_PATH),hvReq(HV_IMG)]);
+    var now=new Date(),pad=function(n){return (n<10?'0':'')+n;};
+    var out={app:'강둥이네와 함께',kind:'full-backup',at:now.toISOString(),paths:{}};
+    out.paths[core.slice(1)]=r[0];out.paths[core.slice(1)+'_notices']=r[1];out.paths[HV_PATH.slice(1)]=r[2];if(r[3])out.paths[HV_IMG.slice(1)]=r[3];
+    var txt=JSON.stringify(out);
+    if(!r[0]||txt.length<200)throw new Error('받은 데이터가 비어 있어요');
+    var blob=new Blob([txt],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');
+    a.href=url;a.download='강둥이네_백업_'+now.getFullYear()+pad(now.getMonth()+1)+pad(now.getDate())+'_'+pad(now.getHours())+pad(now.getMinutes())+'.json';
+    document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(url);a.remove();},2000);
+    HV.meta=HV.meta||{};HV.meta.lastBackup=Date.now();
+    hvReq(HV_PATH+'/meta/lastBackup','PUT',HV.meta.lastBackup).catch(function(){});
+    showToast('백업 파일을 받았어요 ('+(txt.length/1048576).toFixed(2)+'MB)','success');
+  }catch(e){showToast('백업 실패 ('+e.message+') — 다시 시도해 주세요','cancel');}
+  S.hvBackingUp=false;render();
 }
 
 // ── 📕 일지책 (PDF) ──
@@ -5858,7 +5986,7 @@ function hvBookScope(b){
   return all.sort(function(x,y){return ((so[x.sid]!==undefined?so[x.sid]:99)-(so[y.sid]!==undefined?so[y.sid]:99))||(bo(x)-bo(y))||((x.date||'')<(y.date||'')?-1:1);});
 }
 function rHvBookSetup(){
-  var m=hvMe(),b=S.hvBook||(S.hvBook={sid:'',img:true,priv:true,title:'',kids:'',es:true,qa:true,off:{}});
+  var m=hvMe(),b=S.hvBook||(S.hvBook={sid:'',img:HV_PHOTOS,priv:true,title:'',kids:'',es:true,qa:true,off:{}});
   if(!m)return '';b.off=b.off||{};
   var ss=hvSeriesList().filter(function(s){return hvMyEntries(s.id).length;});
   if(!b.sid&&ss.length)b.sid=ss.length>1?'*':ss[0].id;
@@ -5874,7 +6002,7 @@ function rHvBookSetup(){
   h+='<div class="hv-fc"><div class="hv-fl">책 제목</div><input class="hv-in" data-hvb="title" value="'+esc(b.title)+'">'+
     '<div class="hv-fl" style="margin-top:10px;">표지에 넣을 이름</div><input class="hv-in" data-hvb="kids" value="'+esc(b.kids)+'" placeholder="예: 강이 · 둥이"></div>';
   h+='<div class="hv-fc"><div class="hv-fl">담을 내용</div><div class="hv-chips">'+
-    '<button class="hv-chip'+(b.img?' on':'')+'" data-hv="bimg">'+(b.img?'✓ ':'')+'사진 넣기</button>'+
+    (HV_PHOTOS?'<button class="hv-chip'+(b.img?' on':'')+'" data-hv="bimg">'+(b.img?'✓ ':'')+'사진 넣기</button>':'')+
     '<button class="hv-chip'+(b.es!==false?' on':'')+'" data-hv="bes">'+(b.es!==false?'✓ ':'')+'독서감상문</button>'+
     '<button class="hv-chip'+(b.qa!==false?' on':'')+'" data-hv="bqa">'+(b.qa!==false?'✓ ':'')+'질문·대답 기록</button>'+
     '<button class="hv-chip'+(b.priv?' on':'')+'" data-hv="bpriv">'+(b.priv?'✓ ':'')+'나만 보기 일지도 넣기</button></div></div>';
@@ -6006,8 +6134,10 @@ document.addEventListener('click',function(e){
   var st=hvSt(),m=hvMe();
   e.stopPropagation();
   if(a==='reload'){hvLoad(true);HV.imgs={};render();return;}
+  if(a==='fmore'){hvFeedLoad(true);return;}
   if(a==='v'){if(st.v==='write'&&S.hvDraft&&!S.hvDraft.id)hvDraftStash();if(st.v==='sedit'&&S.hvEdit&&!confirm('저장하지 않은 변경은 사라져요. 나갈까요?'))return;S.hvDraft=null;S.hvEdit=null;st.v=x;
-    if(x==='mine'){var nw=hvNewCmts();S.hvFresh={};nw.forEach(function(cid){S.hvFresh[cid]=1;Object.keys(HV.cmts).forEach(function(eid){if(HV.cmts[eid]&&HV.cmts[eid][cid])st.oe[eid]=true;});});try{localStorage.setItem(hvSeenKey(),String(Date.now()));}catch(er){}}
+    if(x==='mine'){var nw=hvNewCmts();S.hvFresh={};nw.forEach(function(cid){S.hvFresh[cid]=1;var n0=HV.noti[cid];if(n0&&n0.eid){st.oe[n0.eid]=true;delete HV.cmts[n0.eid];}});
+      if(nw.length&&m){HV.noti={};hvReq(HV_PATH+'/noti/'+m.id,'DELETE').catch(function(){});}}
     render();window.scrollTo(0,0);return;}
   if(a==='exit'){if(st.v==='write'&&S.hvDraft&&!S.hvDraft.id)hvDraftStash();S.tab='ci';try{localStorage.setItem('kkang_last_tab','ci');}catch(er){}render();window.scrollTo(0,0);return;}
   if(a==='sopen'){var sl=hvSeriesList(),s0=HV.series[x];var books=s0?hvBooks(s0):[];var def=books.some(function(b){return hvThisWeek(b.date);})||sl.length===1;st.open[x]=!(st.open[x]!==undefined?st.open[x]:def);render();return;}
@@ -6023,7 +6153,7 @@ document.addEventListener('click',function(e){
     if(!m){showToast('멤버 계정으로 로그인해주세요','cancel');return;}
     var rk=hvReadKey(x,m.id),was=HV.reads[rk],p={};p[rk]=was?null:hvToday();
     if(was)delete HV.reads[rk];else HV.reads[rk]=p[rk];render();
-    hvReq(HV_PATH+'/reads','PATCH',p).catch(function(){if(was)HV.reads[rk]=was;else delete HV.reads[rk];render();showToast('저장 실패 — 다시 눌러주세요','cancel');});
+    hvReq(HV_PATH+'/readsBy/'+m.id+'/'+x,was?'DELETE':'PUT',was?undefined:p[rk]).catch(function(){if(was)HV.reads[rk]=was;else delete HV.reads[rk];render();showToast('저장 실패 — 다시 눌러주세요','cancel');});
     return;
   }
   if(a==='write'){hvOpenWrite(x,y);return;}
@@ -6039,7 +6169,7 @@ document.addEventListener('click',function(e){
     var same=(ps.books||[]).filter(function(bk){return bk.title===pt;})[0];
     if(same){hvOpenWrite(ps.id,same.id);return;}
     var nb={id:hvId('bk'),title:pt},nbs=(ps.books||[]).concat([nb]);
-    hvReq(HV_PATH+'/series/'+ps.id+'/books','PUT',nbs).then(function(){ps.books=nbs;hvOpenWrite(ps.id,nb.id);})
+    hvReq(hvSeriesPath(ps)+'/books','PUT',nbs).then(function(){ps.books=nbs;hvOpenWrite(ps.id,nb.id);})
       .catch(function(er){showToast('추가 실패 ('+er.message+')','cancel');});
     return;
   }
@@ -6048,7 +6178,7 @@ document.addEventListener('click',function(e){
     var en=HV.entries[x];if(!en)return;
     if(!confirm('「'+(en.btitle||'')+'」 일지를 삭제할까요? 되돌릴 수 없어요.'))return;
     Promise.all([hvReq(HV_PATH+'/entries/'+x,'DELETE'),en.nimg?hvReq(HV_IMG+'/'+x,'DELETE'):null,HV.cmts[x]?hvReq(HV_PATH+'/cmts/'+x,'DELETE'):null]).then(function(){
-      delete HV.entries[x];delete HV.imgs[x];delete HV.cmts[x];showToast('삭제했어요','cancel');render();
+      delete HV.entries[x];delete HV.imgs[x];delete HV.cmts[x];if(HV.feed){var fx=HV.feed.ids.indexOf(x);if(fx>=0)HV.feed.ids.splice(fx,1);}showToast('삭제했어요','cancel');render();
     }).catch(function(er){showToast('삭제 실패 ('+er.message+')','cancel');});
     return;
   }
@@ -6067,15 +6197,19 @@ document.addEventListener('click',function(e){
     if(txt.length>300)txt=txt.slice(0,300);
     var cid=hvId('c'),cm={mid:m.id,name:shortName(m),text:txt,at:Date.now()};
     el.disabled=true;
+    var ce=HV.entries[x];
     hvReq(HV_PATH+'/cmts/'+x+'/'+cid,'PUT',cm).then(function(){
-      HV.cmts[x]=HV.cmts[x]||{};HV.cmts[x][cid]=cm;render();
+      HV.cmts[x]=HV.cmts[x]||{};HV.cmts[x][cid]=cm;hvCmtCount(x);
+      if(ce&&ce.mid&&ce.mid!==m.id)hvReq(HV_PATH+'/noti/'+ce.mid+'/'+cid,'PUT',{eid:x,at:cm.at,from:cm.name,bt:(ce.btitle||'').slice(0,40)}).catch(function(){});
+      render();
       var b2=document.querySelector('[data-hv="cmadd"][data-x="'+x+'"]');if(b2)b2.scrollIntoView({block:'center'});
     }).catch(function(er){el.disabled=false;showToast('댓글 저장 실패 ('+er.message+') — 글은 그대로 있어요','cancel');});
     return;
   }
   if(a==='cmdel'){
     if(!confirm('댓글을 삭제할까요?'))return;
-    hvReq(HV_PATH+'/cmts/'+x+'/'+y,'DELETE').then(function(){if(HV.cmts[x])delete HV.cmts[x][y];render();})
+    var de=HV.entries[x];
+    hvReq(HV_PATH+'/cmts/'+x+'/'+y,'DELETE').then(function(){if(HV.cmts[x])delete HV.cmts[x][y];hvCmtCount(x);if(de&&de.mid)hvReq(HV_PATH+'/noti/'+de.mid+'/'+y,'DELETE').catch(function(){});render();})
       .catch(function(er){showToast('삭제 실패 ('+er.message+')','cancel');});
     return;
   }
@@ -6119,7 +6253,7 @@ document.addEventListener('click',function(e){
   if(a==='bselall'){S.hvBook.off={};render();return;}
   if(a==='bselnone'){var bo2=S.hvBook,off={};hvBookScope(bo2).forEach(function(e){off[e.id]=true;});bo2.off=off;render();return;}
   if(a==='epdf'){var en2=HV.entries[x];if(!en2)return;var kn=hvKids(m.id).map(function(k){return k.name;}).join(' · ');
-    S.hvBook={sid:en2.sid,img:true,priv:true,title:en2.btitle+' 독후일지',kids:kn,es:true,qa:true,off:{},only:[x]};hvMakeBook();return;}
+    S.hvBook={sid:en2.sid,img:HV_PHOTOS,priv:true,title:en2.btitle+' 독후일지',kids:kn,es:true,qa:true,off:{},only:[x]};hvMakeBook();return;}
   if(a==='bprint'){window.print();return;}
   if(a==='bclose'){hvCloseBook();return;}
   if(a==='qprint'){hvOpenQSheet(x,[y]);return;}
@@ -6140,6 +6274,7 @@ document.addEventListener('click',function(e){
   // 관리
   var c=S.hvEdit,adm=hvAdm();
   if(adm){
+  if(a==='backup'){hvBackup();return;}
   if(a==='aplist'){st.ap=st.ap||{};st.ap[x]=!st.ap[x];render();return;}
   if(a==='apok'){var ap0=HV.apps[x]&&HV.apps[x][y]||{};hvAppSet(x,y,{st:'ok',at:ap0.at||Date.now(),name:ap0.name||'',okAt:Date.now()}).catch(function(){});return;}
   if(a==='apno'){var ap1=HV.apps[x]&&HV.apps[x][y]||{};if(!confirm((ap1.st==='ok'?'승인을 취소할까요?':'신청을 거절할까요?')+'\n(이미 쓴 일지는 지워지지 않아요)'))return;hvAppSet(x,y,{st:'no',at:ap1.at||Date.now(),name:ap1.name||''}).catch(function(){});return;}
@@ -6196,7 +6331,7 @@ document.addEventListener('click',function(e){
   }
   if(a==='sdel'){
     if(!confirm('「'+c.name+'」'+(c.owner?' 책장':' 일정')+'을 삭제할까요?\n(쓴 일지는 지워지지 않고 남아요)'))return;
-    hvReq(HV_PATH+'/series/'+c.id,'DELETE').then(function(){delete HV.series[c.id];var bk1=c.owner?'shelf':'admin';S.hvEdit=null;st.v=bk1;showToast('삭제했어요','cancel');render();})
+    hvReq(hvSeriesPath(c),'DELETE').then(function(){delete HV.series[c.id];var bk1=c.owner?'shelf':'admin';S.hvEdit=null;st.v=bk1;showToast('삭제했어요','cancel');render();})
       .catch(function(er){showToast('삭제 실패 ('+er.message+')','cancel');});
     return;
   }
@@ -6227,9 +6362,9 @@ document.addEventListener('input',function(e){
 document.addEventListener('change',function(e){
   if(S.tab!=='hav')return;
   var t=e.target;
-  if(t.getAttribute&&t.getAttribute('data-hvsel')==='ff'){hvSt().ff=t.value;render();return;}
+  if(t.getAttribute&&t.getAttribute('data-hvsel')==='ff'){hvSt().ff=t.value;HV.feed=null;render();return;}
   if(t.getAttribute&&t.getAttribute('data-hvsel')==='bsid'){S.hvBook.sid=t.value;S.hvBook.title='';S.hvBook.off={};render();return;}
-  if(t.id==='hv-file'&&S.hvDraft&&S.hvDraft.imgs){
+  if(HV_PHOTOS&&t.id==='hv-file'&&S.hvDraft&&S.hvDraft.imgs){
     var d=S.hvDraft,files=Array.prototype.slice.call(t.files||[],0,3-d.imgs.length);
     if(!files.length)return;
     Promise.all(files.map(hvCompress)).then(function(arr){
