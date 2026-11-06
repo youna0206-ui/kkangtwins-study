@@ -519,6 +519,20 @@ body.hv-mode #app{background:#FBF8F3}
 .hb-esh{font-weight:800;font-size:15px;color:#3B5F52;margin-bottom:6px}
 .hb-esh span{font-size:12px;font-weight:600;color:#8A7C68}
 .hb-essay p{margin:0 0 7px;text-indent:.6em;line-height:1.85;white-space:pre-wrap}
+/* 신청 · 내 책장 */
+.hv-apply{border-style:dashed}
+.hv-pv{font-size:12.5px;color:var(--mu);background:var(--bgd);padding:7px 9px;margin-top:8px;line-height:1.6}
+.hv-next.done{flex-wrap:wrap;gap:6px}
+.hv-sb-alert{border-color:var(--rd);color:var(--rd)}
+.hv-sb.hv-ok{border-color:var(--pr);color:var(--pr)}
+.hv-apl{border-top:1px solid var(--br);margin-top:10px;padding-top:10px}
+.hv-apl-t{font-size:13px;font-weight:800;color:var(--tx);margin-bottom:6px;display:flex;align-items:center;gap:8px}
+.hv-apr{display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px dashed var(--br);font-size:13.5px}
+.hv-apr span:first-child{flex:1;min-width:0;font-weight:600}
+.hv-apr .hv-sb{padding:.35rem .55rem;font-size:12px}
+.hv-must{display:inline-block;font-size:10.5px;font-weight:800;color:#fff;background:var(--pr);padding:1px 6px;margin-left:4px;vertical-align:1px}
+.hv-req.err{border-color:var(--rd);background:#FDF4F2}
+.hv-req.err .hv-in{border-color:var(--rd)}
 </style>
 </head>
 <body>
@@ -4911,7 +4925,7 @@ var HV_PRESETS={lili:{"key": "lili", "name": "리리의 이야기 숲 하브루�
 var HV_NAME='하브루타 독후일지',HV_SHORT='독후일지';
 var HV_PATH=DB_PATH.replace('.json','_hav');
 var HV_IMG=DB_PATH.replace('.json','_havimg');
-var HV={loaded:false,loading:false,err:'',series:{},entries:{},reads:{},kids:{},imgs:{},imgLoading:{}};
+var HV={loaded:false,loading:false,err:'',series:{},entries:{},reads:{},kids:{},apps:{},imgs:{},imgLoading:{}};
 function hvReq(p,method,body){
   var o={method:method||'GET'};
   if(body!==undefined){o.headers={'Content-Type':'application/json'};o.body=JSON.stringify(body);}
@@ -4921,7 +4935,7 @@ function hvLoad(force){
   if(HV.loading||(HV.loaded&&!force))return;
   HV.loading=true;HV.err='';
   hvReq(HV_PATH).then(function(d){
-    d=d||{};HV.series=d.series||{};HV.entries=d.entries||{};HV.reads=d.reads||{};HV.kids=d.kids||{};HV.loaded=true;hvOutboxMerge();setTimeout(hvFlush,500);
+    d=d||{};HV.series=d.series||{};HV.entries=d.entries||{};HV.reads=d.reads||{};HV.kids=d.kids||{};HV.apps=d.apps||{};HV.loaded=true;hvOutboxMerge();setTimeout(hvFlush,500);
   }).catch(function(e){HV.err='불러오지 못했어요 ('+e.message+')';}).then(function(){
     HV.loading=false;if(S.tab==='hav'&&!S.home)render();
   });
@@ -4955,11 +4969,25 @@ function hvBooks(s){
 function hvSeriesList(){
   var m=hvMe(),adm=hvAdm(),t=memTier(m);
   return Object.keys(HV.series).map(function(k){return HV.series[k];}).filter(function(s){
-    if(!s)return false;if(adm)return true;
+    if(!s)return false;
+    if(s.owner)return !!m&&s.owner===m.id;
+    if(adm)return true;
     if(s.active===false)return false;
     return !s.tiers||!s.tiers.length||s.tiers.indexOf(t)>=0;
   }).sort(function(a,b){return (a.order||0)-(b.order||0)||(a.createdAt||0)-(b.createdAt||0);});
 }
+function hvOfficial(){return hvSeriesList().filter(function(s){return !s.owner;});}
+function hvShelf(){return hvSeriesList().filter(function(s){return !!s.owner;});}
+// 신청 상태: 'ok' 승인 · 'wait' 대기 · 'no' 거절 · '' 미신청
+function hvAppSt(sid,mid){var a=HV.apps[sid]&&HV.apps[sid][mid];return a&&a.st||'';}
+function hvCanWrite(s){
+  var m=hvMe();if(!s||!m)return false;
+  if(s.owner)return s.owner===m.id;
+  if(hvAdm())return true;
+  return hvAppSt(s.id,m.id)==='ok';
+}
+var HV_GENERIC=['[책과 만나기] 표지와 제목을 보니 어떤 이야기일 것 같았어?','[무슨 일이] 책에 누가 나왔어? 어떤 일이 있었니?','[마음 읽기] 주인공은 왜 그렇게 했을까? 그때 마음이 어땠을까?','[만약에] 만약 이야기가 다르게 흘러간다면 어떻게 될까?','[나라면] 너라면 어떻게 했을 것 같아? 너도 비슷한 일이 있었니?','[내 생각] 이 책에서 가장 중요한 건 뭐라고 생각해? 왜?','[한마디] 가장 기억에 남는 장면은 뭐야? 주인공에게 해 주고 싶은 말은?'];
+function hvBookQs(s,b){return (b&&b.qs&&b.qs.length)?b.qs:((s&&s.qsDefault)||[]);}
 function hvFindBook(sid,bid){var s=HV.series[sid];if(!s)return null;return (s.books||[]).filter(function(b){return b.id===bid;})[0]||null;}
 function hvMyEntry(bid,mid){
   var ks=Object.keys(HV.entries);
@@ -4985,11 +5013,12 @@ function rHavPage(){
     '<div class="hv-hd-c"><div class="hv-hd-t">'+HV_NAME+'</div><div class="hv-hd-s">강둥이네와 함께 읽고 묻고 기록해요</div></div>'+
     '<button class="hv-hd-r" data-hv="reload" aria-label="새로고침">↻</button></div>';
   h+='<div class="hv-main">'+rHav()+'</div>';
-  var tabs=[['plan','일정','<path d="M4 5.5h16v14H4z"/><path d="M4 9.5h16M8.5 3.5v4M15.5 3.5v4"/>'],
+  var tabs=[['plan','스터디','<path d="M4 5.5h16v14H4z"/><path d="M4 9.5h16M8.5 3.5v4M15.5 3.5v4"/>'],
+    ['shelf','내 책장','<path d="M5 4h3.5v16H5zM10.5 4H14v16h-3.5z"/><path d="M16 5.2l3.3-.9 3.2 15.3-3.3.9z"/>'],
     ['mine','내 일지','<path d="M6 3.5h9l3 3v14H6z"/><path d="M9 10h6M9 13.5h6M9 17h4"/>'],
     ['feed','함께 보기','<circle cx="9" cy="9" r="3.2"/><circle cx="16.5" cy="10" r="2.6"/><path d="M3.5 19.5c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5M14.5 15.2c2.6-.4 5 1 5.8 4.3"/>']];
   if(adm)tabs.push(['admin','관리','<circle cx="12" cy="12" r="3"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8"/>']);
-  var cur=st.v==='write'?(S.hvDraft&&S.hvDraft.id?'mine':'plan'):st.v==='sedit'?'admin':st.v==='book'?'mine':st.v;
+  var cur=st.v==='write'?(S.hvDraft&&S.hvDraft.id?'mine':'plan'):st.v==='sedit'?(S.hvEdit&&S.hvEdit.owner?'shelf':'admin'):st.v==='book'?'mine':st.v;
   S._bnav='<nav class="bnav hv-nav"><div class="bnav-in">'+tabs.map(function(t){
     return '<button class="bnav-b'+(cur===t[0]?' on':'')+'" data-hv="v" data-x="'+t[0]+'"><svg viewBox="0 0 24 24">'+t[2]+'</svg><span>'+t[1]+'</span></button>';
   }).join('')+'</div></nav>';
@@ -5007,13 +5036,14 @@ function rHav(){
   var nOut=hvOutboxN();
   if(nOut)h+='<div class="hv-warn">⏳ 아직 서버에 저장되지 않은 일지가 '+nOut+'개 있어요. 이 기기에 안전하게 보관 중이에요.<button data-hv="flush">지금 다시 저장</button></div>';
   if(st.v==='write')return h+rHvWrite()+'</div>';
-  if(st.v==='sedit'&&adm)return h+rHvSeriesEdit()+'</div>';
-  var ttl={book:['📕 일지책 만들기','모은 일지를 PDF 책으로 저장해요'],plan:['📅 읽기 일정','전집을 함께 읽고, 질문으로 대화해요'],mine:['📝 내 일지','우리 아이와 나눈 대화 모음'],feed:['👀 함께 보기','다른 엄마들의 하브루타 기록'],admin:['⚙️ 관리','전집 · 책 · 질문 등록']}[st.v]||['',''];
+  if(st.v==='sedit'&&(adm||(S.hvEdit&&S.hvEdit.owner&&m&&S.hvEdit.owner===m.id)))return h+rHvSeriesEdit()+'</div>';
+  var ttl={shelf:['📔 내 책장','우리 집 책으로 나만의 독후일지를 만들어요'],book:['📕 일지책 만들기','모은 일지를 PDF 책으로 저장해요'],plan:['📚 독후일지 스터디','강둥맘과 함께 전집을 읽고, 질문으로 대화해요'],mine:['📝 내 일지','우리 아이와 나눈 대화 모음'],feed:['👀 함께 보기','다른 엄마들의 하브루타 기록'],admin:['⚙️ 관리','전집 · 책 · 질문 등록']}[st.v]||['',''];
   h+='<div class="hv-pt"><div class="hv-pt-t">'+ttl[0]+'</div><div class="hv-pt-s">'+ttl[1]+'</div></div>';
   if(st.v==='mine')h+=rHvMine();
   else if(st.v==='feed')h+=rHvFeed();
   else if(st.v==='admin'&&adm)h+=rHvAdmin();
   else if(st.v==='book')h+=rHvBookSetup();
+  else if(st.v==='shelf')h+=rHvShelf();
   else h+=rHvPlan();
   if(st.zoom)h+='<div class="hv-zoom" data-hv="unzoom"><img src="'+st.zoom+'" alt=""></div>';
   return h+'</div>';
@@ -5088,11 +5118,25 @@ function hvGuideHtml(g){
 }
 
 // ── 📅 읽기 일정 ──
+function hvShelfHint(){return '<div class="hv-stat" style="padding:4px 2px;line-height:1.6;">📔 우리 집 책으로 자유롭게 쓰고 싶다면 아래 <b>내 책장</b>에서 나만의 일지를 만들 수 있어요.</div>';}
+function rHvApplyCard(s){
+  var m=hvMe(),ap=m?hvAppSt(s.id,m.id):'',bs=hvBooks(s);
+  var h='<div class="hv-sr hv-apply"><div class="hv-sr-h" style="cursor:default;"><div style="flex:1;min-width:0;">'+
+    '<div class="hv-sr-n">'+esc(s.name)+' <span class="hv-tag">🔒 신청 후 이용</span></div>'+(s.desc?'<div class="hv-sr-d">'+esc(s.desc)+'</div>':'')+
+    '<div class="hv-sr-p">📚 '+bs.length+'권 · 부모 가이드와 하브루타 질문 포함</div>'+
+    (bs.length?'<div class="hv-pv">'+bs.slice(0,3).map(function(b,i){return (i+1)+'. '+esc(b.title);}).join('<br>')+(bs.length>3?'<br>… 외 '+(bs.length-3)+'권':'')+'</div>':'')+
+    '</div></div><div style="padding:0 12px 12px;">';
+  if(ap==='wait')h+='<div class="hv-next done">⏳ 신청 완료 · 강둥맘 승인을 기다리고 있어요<button class="hv-sb" data-hv="unapply" data-x="'+s.id+'">신청 취소</button></div>';
+  else h+=(ap==='no'?'<div class="hv-stat" style="margin-bottom:6px;">이번 신청은 승인되지 않았어요. 궁금한 점은 강둥맘에게 문의해 주세요.</div>':'')+
+    '<button class="hv-next" data-hv="apply" data-x="'+s.id+'"><span class="hv-next-l">📝</span><span class="hv-next-t">'+(ap==='no'?'다시 신청하기':'이 스터디 신청하기')+'</span><span class="hv-ar" style="color:#fff">›</span></button>';
+  return h+'</div></div>';
+}
 function rHvPlan(){
-  var st=hvSt(),m=hvMe(),list=hvSeriesList();
-  if(!list.length)return '<div class="card empty">아직 등록된 전집 일정이 없어요.<br>강둥맘이 일정을 올리면 여기에 보여요.</div>';
+  var st=hvSt(),m=hvMe(),list=hvOfficial();
+  if(!list.length)return '<div class="card empty">아직 열린 독후일지 스터디가 없어요.<br>강둥맘이 스터디를 열면 여기에 보여요.</div>'+hvShelfHint();
   var h='';
   list.forEach(function(s){
+    if(!hvCanWrite(s)){h+=rHvApplyCard(s);return;}
     var books=hvBooks(s);
     var nRead=m?books.filter(function(b){return HV.reads[hvReadKey(b.id,m.id)];}).length:0;
     var nWrite=m?books.filter(function(b){return hvMyEntry(b.id,m.id);}).length:0;
@@ -5141,7 +5185,7 @@ function rHvBookRow(s,b,i){
   var read=m&&HV.reads[hvReadKey(b.id,m.id)];
   var mine=m&&hvMyEntry(b.id,m.id);
   var cur=hvThisWeek(b.date);
-  var qs=b.qs||[];
+  var qs=hvBookQs(s,b);
   var h='<div class="hv-bk'+(cur?' cur':'')+'"><div class="hv-bk-r">'+
     '<button class="hv-ck'+(read?' on':'')+'" data-hv="read" data-x="'+b.id+'" title="읽었어요">✓</button>'+
     '<div class="hv-bk-m" data-hv="ob" data-x="'+b.id+'"><div class="hv-bk-d">'+(i+1)+'번째'+(b.date?' · '+hvFmt(b.date):'')+' '+hvTagChip(s,b)+'</div>'+
@@ -5156,6 +5200,26 @@ function rHvBookRow(s,b,i){
   return h+'</div>';
 }
 
+function rHvShelf(){
+  var m=hvMe();if(!m)return '<div class="card empty">멤버 계정으로 로그인하면 나만의 일지를 만들 수 있어요.</div>';
+  var st=hvSt(),list=hvShelf();
+  var h='<div class="hv-flow">📔 집에 있는 전집이나 그림책으로 <b>나만의 독후일지</b>를 만들어요. 기본 하브루타 질문이 들어 있어서 답하다 보면 감상문이 완성돼요. 처음 설정은 \'나만 보기\'예요.</div>';
+  h+='<button class="hv-preset" data-hv="pnew"><b>+ 새 책장 만들기</b><span>예: 우리 집 자연관찰 전집, 도서관 책, 잠자리 그림책</span></button>';
+  list.forEach(function(s){
+    var books=hvBooks(s),nW=books.filter(function(b){return hvMyEntry(b.id,m.id);}).length;
+    var open=st.open[s.id]!==undefined?st.open[s.id]:true;
+    h+='<div class="hv-sr"><div class="hv-sr-h" data-hv="sopen" data-x="'+s.id+'"><div style="flex:1;min-width:0;"><div class="hv-sr-n">📔 '+esc(s.name)+'</div>'+
+      (s.desc?'<div class="hv-sr-d">'+esc(s.desc)+'</div>':'')+'<div class="hv-sr-p">책 '+books.length+'권 · 일지 '+nW+'권</div></div><span class="hv-ar">'+(open?'▲':'▼')+'</span></div>';
+    h+='<div style="padding:0 12px 12px;display:flex;flex-direction:column;gap:8px;">'+
+      '<div class="hv-row"><input class="hv-in" id="hv-pb-'+s.id+'" placeholder="읽은 책 제목을 적고 바로 쓰기" maxlength="60"><button class="abtn" data-hv="pquick" data-x="'+s.id+'">✏️ 쓰기</button></div>'+
+      (books.some(function(b){return !hvMyEntry(b.id,m.id);})?hvNextBtn(s):'')+'</div>';
+    if(open)books.forEach(function(b,i){h+=rHvBookRow(s,b,i);});
+    h+='<div style="padding:10px 12px;border-top:1px solid var(--br);"><button class="hv-sb" data-hv="pedit" data-x="'+s.id+'">⚙️ 책장 편집 (책 목록·질문)</button></div></div>';
+  });
+  if(!list.length)h+='<div class="card empty">아직 만든 책장이 없어요.</div>';
+  return h;
+}
+
 // ── 일지 카드 (내 일지 / 함께 보기 공용) ──
 function rHvEntry(e,mode){
   var st=hvSt(),m=hvMe(),adm=hvAdm(),open=!!st.oe[e.id];
@@ -5165,7 +5229,7 @@ function rHvEntry(e,mode){
   var h='<div class="card hv-en"><div class="hv-en-h" data-hv="eopen" data-x="'+e.id+'">';
   h+='<div class="hv-en-t"><span>'+esc(e.btitle||'')+'</span><span class="hv-ar">'+(open?'▲':'▼')+'</span></div>';
   h+='<div class="hv-en-m">'+(mode==='feed'?'<b style="color:var(--tx)">'+esc(e.mname||'')+'</b> · ':'')+esc(e.sname||'')+' · '+hvFmt(e.date)+
-    (kids.length?' · 👧 '+esc(kids.join(', ')):'')+
+    (e.hero?' · 🦸 '+esc(e.hero):'')+(kids.length?' · 👧 '+esc(kids.join(', ')):'')+
     (mode==='mine'?' <span class="hv-tag">'+(e.pub?'🌏 공개':'🔒 나만')+'</span>':'')+
     (e._pending?' <span class="hv-tag" style="color:var(--rd);border-color:var(--rd);">⏳ 저장 대기</span>':'')+(e.wb?' <span class="hv-tag">워크북 ✓</span>':'')+(e.nimg?' <span class="hv-tag">📷 '+e.nimg+'</span>':'')+
     (hvLikes(e)?' · ❤️ '+hvLikes(e):'')+'</div>';
@@ -5217,8 +5281,8 @@ function rHvMine(){
   var m=hvMe();if(!m)return '<div class="card empty">멤버 계정으로 로그인하면 일지를 쓸 수 있어요.</div>';
   var list=Object.keys(HV.entries).map(function(k){return HV.entries[k];}).filter(function(e){return e&&e.mid===m.id;})
     .sort(function(a,b){return (b.date||'')<(a.date||'')?-1:(b.date||'')>(a.date||'')?1:(b.updatedAt||0)-(a.updatedAt||0);});
-  if(!list.length)return hvSeriesList().map(hvNextBtn).join('')+'<div class="card empty">아직 쓴 일지가 없어요.<br>📅 읽기 일정에서 책을 골라 ✏️ 일지 쓰기를 눌러주세요.</div>';
-  var h=hvSeriesList().map(hvNextBtn).join('');
+  if(!list.length)return hvSeriesList().filter(hvCanWrite).map(hvNextBtn).join('')+'<div class="card empty">아직 쓴 일지가 없어요.<br>📅 읽기 일정에서 책을 골라 ✏️ 일지 쓰기를 눌러주세요.</div>';
+  var h=hvSeriesList().filter(hvCanWrite).map(hvNextBtn).join('');
   h+='<button class="hv-preset" data-hv="v" data-x="book"><b>📕 일지 모아 책 만들기 (PDF)</b><span>표지 · 차례 · 책마다 한 쪽씩, 사진까지 예쁘게 묶어요</span></button>';
   h+='<div class="hv-stat" style="padding:0 2px;">총 '+list.length+'권 기록 · 공개 '+list.filter(function(e){return e.pub;}).length+'권</div>';
   list.forEach(function(e){h+=rHvEntry(e,'mine');});
@@ -5227,12 +5291,13 @@ function rHvMine(){
 
 // ── 👀 함께 보기 ──
 function rHvFeed(){
-  var st=hvSt(),ss=hvSeriesList();
+  var st=hvSt(),ss=hvSeriesList(),ssF=hvOfficial();
   var vis={};ss.forEach(function(s){vis[s.id]=1;});
   var list=Object.keys(HV.entries).map(function(k){return HV.entries[k];}).filter(function(e){
-    return e&&e.pub&&(vis[e.sid]||hvAdm())&&(!st.ff||e.sid===st.ff);
+    var sx=HV.series[e.sid];
+    return e&&e.pub&&(vis[e.sid]||(sx&&sx.owner)||hvAdm())&&(!st.ff||e.sid===st.ff);
   }).sort(function(a,b){return (b.updatedAt||0)-(a.updatedAt||0);});
-  var h='<select class="hv-sel" data-hvsel="ff"><option value="">전체 전집</option>'+ss.map(function(s){return '<option value="'+s.id+'"'+(st.ff===s.id?' selected':'')+'>'+esc(s.name)+'</option>';}).join('')+'</select>';
+  var h='<select class="hv-sel" data-hvsel="ff"><option value="">전체 보기</option>'+ssF.map(function(s){return '<option value="'+s.id+'"'+(st.ff===s.id?' selected':'')+'>'+esc(s.name)+'</option>';}).join('')+'</select>';
   if(!list.length)return h+'<div class="card empty">아직 공개된 일지가 없어요.<br>첫 번째로 나눠주세요 🍀</div>';
   list.forEach(function(e){h+=rHvEntry(e,'feed');});
   return h;
@@ -5240,17 +5305,19 @@ function rHvFeed(){
 
 // ── ✏️ 일지 쓰기 ──
 function hvOpenWrite(sid,bid){
-  S.hvPick=false;S.hvEssayOpen=false;
+  S.hvPick=false;S.hvHeroErr=false;S.hvEssayOpen=false;
   var m=hvMe();if(!m){showToast('멤버 계정으로 로그인해주세요','cancel');return;}
   var b=hvFindBook(sid,bid);if(!b)return;
+  if(!hvCanWrite(HV.series[sid])){showToast('신청 후 강둥맘이 승인하면 쓸 수 있어요','info');return;}
   var ex=hvMyEntry(bid,m.id);
   if(ex){hvOpenEdit(ex.id);return;}
   var d=null;
   try{var raw=localStorage.getItem('kk_hv_draft_'+bid);if(raw)d=JSON.parse(raw);}catch(er){}
-  if(d&&d.bid===bid&&!d.id){d.imgs=[];d.imgsChanged=false;d.essay=d.essay||{};d.essayEd=d.essayEd||{};showToast('임시저장된 내용을 불러왔어요','info');}
+  if(d&&d.bid===bid&&!d.id){d.imgs=[];d.imgsChanged=false;d.essay=d.essay||{};d.essayEd=d.essayEd||{};if(!d.hero)d.hero=b.hero||'';showToast('임시저장된 내용을 불러왔어요','info');}
   else{
     var ks={};hvKids(m.id).forEach(function(k){ks[k.id]=true;});
-    d={id:'',sid:sid,bid:bid,date:hvToday(),ks:ks,qs:(b.qs||[]).slice(),ans:{},talk:{},essay:{},essayEd:{},insight:'',wb:false,pub:true,imgs:[],imgsChanged:false,hero:b.hero||''};
+    var sx=HV.series[sid];
+    d={id:'',sid:sid,bid:bid,date:hvToday(),ks:ks,qs:hvBookQs(sx,b).slice(),ans:{},talk:{},essay:{},essayEd:{},insight:'',wb:false,pub:!(sx&&sx.owner),imgs:[],imgsChanged:false,hero:b.hero||''};
   }
   S.hvDraft=d;hvSt().v='write';render();window.scrollTo(0,0);
 }
@@ -5260,10 +5327,10 @@ function hvOpenEdit(eid){
   var ks={};if(e.kids)Object.keys(e.kids).forEach(function(k){ks[k]=true;});
   S.hvDraft={id:e.id,sid:e.sid,bid:e.bid,date:e.date||hvToday(),ks:ks,qs:(e.qs||[]).slice(),
     ans:JSON.parse(JSON.stringify(e.ans||{})),talk:JSON.parse(JSON.stringify(e.talk||{})),insight:e.insight||'',
-    essay:JSON.parse(JSON.stringify(e.essay||{})),essayEd:(function(){var o={};Object.keys(e.essay||{}).forEach(function(k){o[k]=true;});return o;})(),hero:e.hero||'',
+    essay:JSON.parse(JSON.stringify(e.essay||{})),essayEd:(function(){var o={};Object.keys(e.essay||{}).forEach(function(k){o[k]=true;});return o;})(),hero:e.hero||((hvFindBook(e.sid,e.bid)||{}).hero)||'',
     wb:!!e.wb,pub:!!e.pub,imgs:e.nimg?(HV.imgs[e.id]?HV.imgs[e.id].slice():null):[],imgsChanged:false,createdAt:e.createdAt,
     btitle:e.btitle,sname:e.sname};
-  try{var rs=localStorage.getItem('kk_hv_draft_'+e.id);if(rs){var rd=JSON.parse(rs);if(rd&&rd._at>(e.updatedAt||0)){['date','ks','ans','talk','insight','wb','pub','essay','essayEd'].forEach(function(f){if(rd[f]!==undefined)S.hvDraft[f]=rd[f];});showToast('저장 전에 고치던 내용을 불러왔어요','info');}}}catch(er){}
+  try{var rs=localStorage.getItem('kk_hv_draft_'+e.id);if(rs){var rd=JSON.parse(rs);if(rd&&rd._at>(e.updatedAt||0)){['date','ks','ans','talk','insight','wb','pub','essay','essayEd','hero'].forEach(function(f){if(rd[f]!==undefined)S.hvDraft[f]=rd[f];});showToast('저장 전에 고치던 내용을 불러왔어요','info');}}}catch(er){}
   if(S.hvDraft.imgs===null){
     hvReq(HV_IMG+'/'+e.id).then(function(dd){
       var arr=dd?Object.keys(dd).sort().map(function(k){return dd[k];}).filter(hvImgOk):[];
@@ -5293,6 +5360,10 @@ function rHvWrite(){
   }
   h+='<div class="hv-fc"><div class="hv-hero-s" style="margin:0 0 2px;">'+esc(sname)+'</div><div class="hv-hero-t">'+esc(title)+'</div>'+
     (b&&b.guide?'<details class="hv-gd"><summary>📘 부모 가이드 보기</summary><div class="hv-guide" style="margin:8px 0 0;">'+hvGuideHtml(b.guide)+'</div></details>':'')+'</div>';
+  // 주인공 이름 (필수)
+  h+='<div class="hv-fc hv-req'+(S.hvHeroErr?' err':'')+'"><div class="hv-fl">🦸 주인공 이름 <span class="hv-must">필수</span></div>'+
+    '<input class="hv-in" id="hv-hero" data-hvt="hero" value="'+esc(d.hero||'')+'" placeholder="예: 나나, 올리, 아기 곰" maxlength="20">'+
+    '<div class="hv-fh" style="margin:6px 0 0;">감상문의 \'○○에게 해 주고 싶은 말\'에 들어가요.'+((b&&b.hero)?'':' 한 번 적으면 이 책에 기억돼요.')+'</div></div>';
   // 날짜 + 워크북
   h+='<div class="hv-fc"><div class="hv-fl">📅 대화한 날</div><input type="date" class="hv-in" data-hvt="date" value="'+esc(d.date)+'">'+
     (s&&s.wb?'<div class="hv-chips" style="margin-top:10px;"><button class="hv-chip'+(d.wb?' on':'')+'" data-hv="wb">'+(d.wb?'✓ ':'')+'워크북도 했어요</button></div>':'')+'</div>';
@@ -5324,7 +5395,7 @@ function rHvWrite(){
   }).join('')+'</div>';
   // 📄 독서감상문
   var ek=sel.length?sel.map(function(k){return k.id;}):['k0'];
-  var ex={qs:d.qs,ans:d.ans,talk:d.talk,btitle:title,hero:(b&&b.hero)||d.hero};
+  var ex={qs:d.qs,ans:d.ans,talk:d.talk,btitle:title,hero:d.hero||(b&&b.hero)};
   h+='<div class="hv-fc hv-es"><div class="hv-fl">📄 독서감상문</div>';
   if(!S.hvEssayOpen)h+='<div class="hv-fh">답한 내용을 처음·가운데·끝으로 엮어 감상문을 만들어 드려요. 엮은 뒤 자유롭게 다듬을 수 있어요.</div><button class="abtn" data-hv="essay" style="width:100%;">📄 답변으로 감상문 엮기</button>';
   else ek.forEach(function(k){
@@ -5455,8 +5526,10 @@ async function hvSave(){
   Object.keys(kmap).forEach(function(k){if(k!=='k0'&&k!=='all'&&!d.ks[k])delete kmap[k];});
   var e={id:d.id||hvId('hv'),mid:m.id,mname:shortName(m),sid:d.sid,bid:d.bid,
     btitle:(b&&b.title)||d.btitle||'',sname:(s&&s.name)||d.sname||'',date:d.date||hvToday(),
-    kids:kmap,qs:d.qs||[],ans:ans,talk:talk,essay:(function(){var o={};Object.keys(d.essay||{}).forEach(function(k){if(d.essayEd&&d.essayEd[k]&&(d.essay[k]||'').trim()&&(k==='k0'||k==='all'||d.ks[k]))o[k]=d.essay[k].trim();});return o;})(),hero:(b&&b.hero)||d.hero||'',insight:(d.insight||'').trim(),wb:!!d.wb,pub:!!d.pub,
+    kids:kmap,qs:d.qs||[],ans:ans,talk:talk,essay:(function(){var o={};Object.keys(d.essay||{}).forEach(function(k){if(d.essayEd&&d.essayEd[k]&&(d.essay[k]||'').trim()&&(k==='k0'||k==='all'||d.ks[k]))o[k]=d.essay[k].trim();});return o;})(),hero:(d.hero||'').trim(),insight:(d.insight||'').trim(),wb:!!d.wb,pub:!!d.pub,
     nimg:(d.imgs||[]).length,createdAt:d.createdAt||Date.now(),updatedAt:Date.now()};
+  if(!(d.hero||'').trim()){S.hvHeroErr=true;render();showToast('주인공 이름을 적어 주세요','cancel');var hi=g('hv-hero');if(hi){hi.scrollIntoView({block:'center'});hi.focus();}return;}
+  S.hvHeroErr=false;
   if(!hvHasText(e)&&!e.nimg){showToast('대화 내용을 한 줄 이상 적어주세요','cancel');return;}
   e.imgBytes=(d.imgs||[]).reduce(function(t,x){return t+x.length;},0);
   var rk=hvReadKey(e.bid,m.id);
@@ -5469,6 +5542,10 @@ async function hvSave(){
   var prev=HV.entries[e.id];if(prev&&prev.likes)e.likes=prev.likes;
   HV.entries[e.id]=e;HV.imgs[e.id]=job.imgs;
   try{localStorage.removeItem(hvDraftKey(d));localStorage.removeItem('kk_hv_draft_'+e.bid);}catch(er){}
+  if(saved&&s&&s.owner&&m&&s.owner===m.id&&b&&!b.hero){
+    var bi=(s.books||[]).indexOf(b);
+    if(bi>=0)hvReq(HV_PATH+'/series/'+s.id+'/books/'+bi+'/hero','PUT',e.hero).then(function(){b.hero=e.hero;}).catch(function(){});
+  }
   if(saved){
     showToast(d.id?'수정했어요':'일지를 저장했어요 📖','success');
   } else {
@@ -5490,11 +5567,11 @@ function hvSeriesStats(s){
   return {entries:ne,writers:Object.keys(writers).length};
 }
 function rHvAdmin(){
-  var list=hvSeriesList();
+  var list=hvOfficial(),st=hvSt();
   var h='<button class="abtn" data-hv="snew" style="width:100%;">+ 새 전집 일정 만들기</button>';
   Object.keys(HV_PRESETS).forEach(function(k){
     var p=HV_PRESETS[k],has=list.some(function(s){return s.preset===k;});
-    h+='<button class="hv-preset" data-hv="spreset" data-x="'+k+'"><b>📚 '+esc(p.name)+'</b><span>'+p.books.length+'권 · 주 '+p.perWeek+'권 · 부모가이드·하브루타·누리과정 질문 포함'+(has?' · 이미 만들었어요':'')+'</span></button>';
+    h+='<button class="hv-preset" data-hv="spreset" data-x="'+k+'"><b>📚 '+esc(p.name)+'</b><span>'+p.books.length+'권 · '+(p.perWeek?'주 '+p.perWeek+'권 · ':'책 순서대로 · ')+'부모가이드·하브루타·누리과정 질문 포함'+(has?' · 이미 만들었어요':'')+'</span></button>';
   });
   if(!list.length)h+='<div class="card empty">전집을 만들고 책·날짜·질문을 넣으면 멤버 화면에 일정이 나타나요.</div>';
   list.forEach(function(s,i){
@@ -5505,7 +5582,10 @@ function rHvAdmin(){
       '<div style="margin-top:5px;">'+tiers+'</div>'+
       '<div class="hv-stat" style="margin-top:6px;">책 '+(s.books||[]).length+'권 · 일지 '+stt.entries+'개 · 참여 '+stt.writers+'명</div></div>'+
       '<div style="display:flex;flex-direction:column;gap:4px;"><button class="hv-mini" data-hv="sup" data-x="'+s.id+'"'+(i===0?' disabled':'')+'>▲</button><button class="hv-mini" data-hv="sdn" data-x="'+s.id+'"'+(i===list.length-1?' disabled':'')+'>▼</button></div></div>'+
-      '<div class="hv-act" style="margin-top:10px;"><button class="hv-sb" data-hv="sedit" data-x="'+s.id+'">✏️ 책·질문 편집</button></div></div>';
+      '<div class="hv-act" style="margin-top:10px;"><button class="hv-sb" data-hv="sedit" data-x="'+s.id+'">✏️ 책·질문 편집</button>'+
+      (function(){var ap=HV.apps[s.id]||{},w=0,o=0;Object.keys(ap).forEach(function(k){if(ap[k]&&ap[k].st==='wait')w++;if(ap[k]&&ap[k].st==='ok')o++;});
+        return '<button class="hv-sb'+(w?' hv-sb-alert':'')+'" data-hv="aplist" data-x="'+s.id+'">👥 신청 '+(w?'대기 '+w+' · ':'')+'승인 '+o+'</button>';})()+'</div>'+
+      (st.ap&&st.ap[s.id]?rHvAppList(s):'')+'</div>';
   });
   var us=hvUsage(),tot=us.img+us.txt,pc=Math.min(100,tot/(700*1048576)*100);
   h+='<div class="card"><div class="hv-fl">💾 독후일지 저장 공간</div><div class="hv-bar" style="height:8px;"><i style="width:'+pc.toFixed(1)+'%;'+(pc>80?'background:var(--rd)':'')+'"></i></div>'+
@@ -5513,10 +5593,37 @@ function rHvAdmin(){
   h+='<div class="hv-stat" style="padding:0 2px;line-height:1.6;">🔒 \'나만 보기\' 일지는 작성한 엄마만 볼 수 있어요. 관리 화면에서는 참여 수만 보여요.</div>';
   return h;
 }
+function rHvAppList(s){
+  var ap=HV.apps[s.id]||{},ks=Object.keys(ap).filter(function(k){return ap[k];});
+  var grp={wait:[],ok:[],no:[]};ks.forEach(function(k){(grp[ap[k].st]||grp.wait).push(k);});
+  ['wait','ok','no'].forEach(function(g){grp[g].sort(function(a,b){return (ap[a].at||0)-(ap[b].at||0);});});
+  var nm=function(k){var mm=(S.members||[]).filter(function(x){return x.id===k;})[0];return mm?shortName(mm):(ap[k].name||k);};
+  var row=function(k,btns){return '<div class="hv-apr"><span>'+esc(nm(k))+'</span><span class="hv-stat">'+(ap[k].at?new Date(ap[k].at).toLocaleDateString('ko-KR'):'')+'</span>'+btns+'</div>';};
+  var h='<div class="hv-apl">';
+  h+='<div class="hv-apl-t">⏳ 승인 대기 '+grp.wait.length+'명'+(grp.wait.length>1?' <button class="hv-sb" data-hv="apall" data-x="'+s.id+'">모두 승인</button>':'')+'</div>';
+  h+=grp.wait.length?grp.wait.map(function(k){return row(k,'<button class="hv-sb hv-ok" data-hv="apok" data-x="'+s.id+'" data-y="'+k+'">승인</button><button class="hv-sb del" data-hv="apno" data-x="'+s.id+'" data-y="'+k+'">거절</button>');}).join(''):'<div class="hv-stat">새 신청이 없어요.</div>';
+  h+='<div class="hv-apl-t" style="margin-top:10px;">✅ 승인됨 '+grp.ok.length+'명</div>'+grp.ok.map(function(k){return row(k,'<button class="hv-sb del" data-hv="apno" data-x="'+s.id+'" data-y="'+k+'">승인 취소</button>');}).join('');
+  if(grp.no.length)h+='<div class="hv-apl-t" style="margin-top:10px;">거절 '+grp.no.length+'명</div>'+grp.no.map(function(k){return row(k,'<button class="hv-sb hv-ok" data-hv="apok" data-x="'+s.id+'" data-y="'+k+'">승인</button>');}).join('');
+  return h+'</div>';
+}
+function hvAppSet(sid,mid,val){
+  HV.apps[sid]=HV.apps[sid]||{};var prev=HV.apps[sid][mid];
+  if(val)HV.apps[sid][mid]=val;else delete HV.apps[sid][mid];render();
+  return hvReq(HV_PATH+'/apps/'+sid+'/'+mid,val?'PUT':'DELETE',val||undefined).catch(function(er){
+    if(prev)HV.apps[sid][mid]=prev;else delete HV.apps[sid][mid];render();showToast('저장 실패 ('+er.message+')','cancel');throw er;});
+}
 function hvNextMon(){var d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()+((8-d.getDay())%7||7));return d;}
 function hvFillDates(books,start,dows){
   var cur=new Date(start);
   books.forEach(function(b){var g=0;while(dows.indexOf(cur.getDay())<0&&g++<7)cur.setDate(cur.getDate()+1);b.date=hvYmd(cur);cur.setDate(cur.getDate()+1);});
+}
+function hvEditStartP(sid){
+  var m=hvMe();if(!m)return;var s=sid?HV.series[sid]:null;
+  if(s&&s.owner!==m.id)return;
+  var c=s?JSON.parse(JSON.stringify(s)):{id:hvId('sr'),name:'',desc:'',owner:m.id,active:true,books:[],qsDefault:HV_GENERIC.slice(),createdAt:Date.now()};
+  c.books=(c.books||[]).map(function(b){b.qsText=(b.qs||[]).join('\n');delete b._i;return b;});
+  c.qsDefText=(c.qsDefault||[]).join('\n');
+  c._new=!s;S.hvEdit=c;hvSt().v='sedit';render();window.scrollTo(0,0);
 }
 function hvEditStart(sid,presetKey){
   var s=sid?HV.series[sid]:null,c;
@@ -5533,6 +5640,7 @@ function rHvSeriesEdit(){
   var cnt={},rd={};
   Object.keys(HV.entries).forEach(function(k){var e=HV.entries[k];if(e)cnt[e.bid]=(cnt[e.bid]||0)+1;});
   Object.keys(HV.reads).forEach(function(k){var b=k.split('__')[0];rd[b]=(rd[b]||0)+1;});
+  if(c.owner)return rHvShelfEdit(c,cnt);
   var h='<button class="hv-back" data-hv="eback">‹ 관리로 돌아가기</button><div class="hv-fm">';
   h+='<div class="hv-fc"><div class="hv-fl">전집 이름</div><input class="hv-in" data-hve="name" value="'+esc(c.name)+'" placeholder="예: 탄탄 인성동화 하브루타">'+
     '<div class="hv-fl" style="margin-top:10px;">소개 (멤버 화면에 보여요)</div><textarea class="hv-ta" data-hve="desc" placeholder="예: 11월~12월, 주 3권씩 함께 읽어요">'+esc(c.desc||'')+'</textarea>'+
@@ -5566,10 +5674,33 @@ function rHvSeriesEdit(){
   h+='</div>';
   return h;
 }
+function rHvShelfEdit(c,cnt){
+  var h='<button class="hv-back" data-hv="eback">‹ 내 책장으로</button><div class="hv-fm">';
+  h+='<div class="hv-fc"><div class="hv-fl">책장 이름</div><input class="hv-in" data-hve="name" value="'+esc(c.name)+'" placeholder="예: 우리 집 자연관찰 전집">'+
+    '<div class="hv-fl" style="margin-top:10px;">메모 (선택)</div><input class="hv-in" data-hve="desc" value="'+esc(c.desc||'')+'" placeholder="예: 잠자리 독서 · 하루 한 권">'+
+    '<div class="hv-chips" style="margin-top:10px;"><button class="hv-chip'+(c.wb?' on':'')+'" data-hv="ewb">'+(c.wb?'✓ ':'')+'워크북 있음</button></div></div>';
+  h+='<div class="hv-fc"><div class="hv-fl">💬 모든 책에 쓸 질문</div><div class="hv-fh">한 줄에 하나. 앞의 [단계] 표시를 남겨 두면 답이 감상문 순서로 엮여요.</div>'+
+    '<textarea class="hv-ta" style="min-height:170px;" data-hve="qsDefText">'+esc(c.qsDefText||'')+'</textarea>'+
+    '<button class="hv-sb" data-hv="eqreset" style="margin-top:6px;">↻ 기본 하브루타 질문으로 되돌리기</button></div>';
+  h+='<div class="hv-fc"><div class="hv-fl">📚 책 한 번에 추가</div><div class="hv-fh">한 줄에 한 권씩 적어요.</div>'+
+    '<textarea class="hv-ta" id="hv-bulk" placeholder="개구리의 한살이&#10;나비가 되었어요"></textarea><button class="abtn" data-hv="ebulk" style="margin-top:8px;width:100%;">목록에 추가</button></div>';
+  h+='<div class="hv-fl" style="margin:4px 2px 0;">책 목록 ('+c.books.length+'권)</div>';
+  c.books.forEach(function(b,i){
+    h+='<div class="hv-eb"><div class="hv-eb-h"><span class="hv-eb-n">'+(i+1)+'</span><input class="hv-in" data-hve="b|'+i+'|title" value="'+esc(b.title)+'" placeholder="책 제목">'+
+      '<button class="hv-mini" data-hv="eup" data-x="'+i+'"'+(i===0?' disabled':'')+'>▲</button><button class="hv-mini" data-hv="edn" data-x="'+i+'"'+(i===c.books.length-1?' disabled':'')+'>▼</button><button class="hv-mini" data-hv="ebdel" data-x="'+i+'" style="color:var(--rd);">✕</button></div>'+
+      '<div class="hv-eb-h"><span class="hv-eb-n"></span><input class="hv-in" data-hve="b|'+i+'|hero" value="'+esc(b.hero||'')+'" placeholder="주인공 이름 (감상문용, 선택)" style="min-height:34px;font-size:12.5px;"><span class="hv-stat" style="flex-shrink:0;">일지 '+(cnt[b.id]||0)+'</span></div>'+
+      '<details'+(b.qsText?' open':'')+'><summary class="hv-stat" style="cursor:pointer;">이 책만의 질문 (선택)</summary><textarea class="hv-ta" data-hve="b|'+i+'|qsText" placeholder="비워 두면 위의 공통 질문을 써요">'+esc(b.qsText||'')+'</textarea></details></div>';
+  });
+  h+='<button class="hv-sb" data-hv="eadd" style="width:100%;padding:.7rem;">+ 책 한 권 추가</button>';
+  h+='<button class="abtn hv-save" data-hv="esave"'+(S.hvSaving?' disabled':'')+'>'+(S.hvSaving?'저장 중...':'저장')+'</button>';
+  if(!c._new)h+='<button class="hv-sb del" data-hv="sdel" style="width:100%;padding:.7rem;">이 책장 삭제</button>';
+  return h+'</div>';
+}
 async function hvEditSave(){
   var c=S.hvEdit;if(!c||S.hvSaving)return;
   if(!(c.name||'').trim()){showToast('전집 이름을 적어주세요','cancel');return;}
   var out={id:c.id,name:c.name.trim(),desc:(c.desc||'').trim(),tiers:(c.tiers&&c.tiers.length)?c.tiers:null,active:c.active!==false,
+    owner:c.owner||null,qsDefault:c.owner?(c.qsDefText||'').split('\n').map(function(x){return x.trim();}).filter(Boolean):null,
     createdAt:c.createdAt||Date.now(),order:c.order||0,perWeek:Math.max(0,parseInt(c.perWeek,10)||0),wb:!!c.wb,tagColors:c.tagColors||null,preset:c.preset||null,
     books:c.books.filter(function(b){return (b.title||'').trim();}).map(function(b){
       var o={id:b.id||hvId('bk'),title:b.title.trim(),date:b.date||'',
@@ -5580,16 +5711,16 @@ async function hvEditSave(){
     })};
   if(!out.books.length)delete out.books;
   if(!out.desc)delete out.desc;
-  ['tagColors','preset'].forEach(function(f){if(!out[f])delete out[f];});if(!out.perWeek)delete out.perWeek;if(!out.wb)delete out.wb;
+  ['tagColors','preset','owner','tiers'].forEach(function(f){if(!out[f])delete out[f];});if(!out.qsDefault||!out.qsDefault.length)delete out.qsDefault;if(!out.perWeek)delete out.perWeek;if(!out.wb)delete out.wb;
   S.hvSaving=true;render();
   try{
     await hvReq(HV_PATH+'/series/'+out.id,'PUT',out);
-    HV.series[out.id]=out;S.hvEdit=null;hvSt().v='admin';showToast('저장했어요','success');
+    HV.series[out.id]=out;S.hvEdit=null;hvSt().v=out.owner?'shelf':'admin';showToast('저장했어요','success');
   }catch(err){showToast('저장 실패 ('+err.message+')','cancel');}
   S.hvSaving=false;render();window.scrollTo(0,0);
 }
 async function hvMoveSeries(sid,dir){
-  var list=hvSeriesList();var i=list.map(function(s){return s.id;}).indexOf(sid),j=i+dir;
+  var list=hvOfficial();var i=list.map(function(s){return s.id;}).indexOf(sid),j=i+dir;
   if(i<0||j<0||j>=list.length)return;
   var t=list[i];list[i]=list[j];list[j]=t;
   var patch={};list.forEach(function(s,k){s.order=k;patch[s.id+'/order']=k;});
@@ -5700,6 +5831,22 @@ document.addEventListener('click',function(e){
     return;
   }
   if(a==='write'){hvOpenWrite(x,y);return;}
+  if(a==='apply'){if(!m){showToast('멤버 계정으로 로그인해주세요','cancel');return;}
+    hvAppSet(x,m.id,{st:'wait',at:Date.now(),name:shortName(m)}).then(function(){showToast('신청했어요! 강둥맘이 승인하면 바로 시작할 수 있어요','success');}).catch(function(){});return;}
+  if(a==='unapply'){if(m&&confirm('신청을 취소할까요?'))hvAppSet(x,m.id,null).catch(function(){});return;}
+  if(a==='pnew'){hvEditStartP(null);return;}
+  if(a==='pedit'){hvEditStartP(x);return;}
+  if(a==='pquick'){
+    var ps=HV.series[x],pi=g('hv-pb-'+x),pt=pi?pi.value.trim():'';
+    if(!ps||!m||ps.owner!==m.id)return;
+    if(!pt){showToast('책 제목을 적어 주세요','info');if(pi)pi.focus();return;}
+    var same=(ps.books||[]).filter(function(bk){return bk.title===pt;})[0];
+    if(same){hvOpenWrite(ps.id,same.id);return;}
+    var nb={id:hvId('bk'),title:pt},nbs=(ps.books||[]).concat([nb]);
+    hvReq(HV_PATH+'/series/'+ps.id+'/books','PUT',nbs).then(function(){ps.books=nbs;hvOpenWrite(ps.id,nb.id);})
+      .catch(function(er){showToast('추가 실패 ('+er.message+')','cancel');});
+    return;
+  }
   if(a==='edit'){hvOpenEdit(x);return;}
   if(a==='edel'){
     var en=HV.entries[x];if(!en)return;
@@ -5757,14 +5904,21 @@ document.addEventListener('click',function(e){
     var sid0=d.sid;S.hvDraft=null;hvOpenWrite(sid0,x);return;
   }
   // 관리
-  if(!hvAdm())return;
-  var c=S.hvEdit;
+  var c=S.hvEdit,adm=hvAdm();
+  if(adm){
+  if(a==='aplist'){st.ap=st.ap||{};st.ap[x]=!st.ap[x];render();return;}
+  if(a==='apok'){var ap0=HV.apps[x]&&HV.apps[x][y]||{};hvAppSet(x,y,{st:'ok',at:ap0.at||Date.now(),name:ap0.name||'',okAt:Date.now()}).catch(function(){});return;}
+  if(a==='apno'){var ap1=HV.apps[x]&&HV.apps[x][y]||{};if(!confirm((ap1.st==='ok'?'승인을 취소할까요?':'신청을 거절할까요?')+'\n(이미 쓴 일지는 지워지지 않아요)'))return;hvAppSet(x,y,{st:'no',at:ap1.at||Date.now(),name:ap1.name||''}).catch(function(){});return;}
+  if(a==='apall'){var apx=HV.apps[x]||{},pt0={};Object.keys(apx).forEach(function(k){if(apx[k]&&apx[k].st==='wait'){apx[k].st='ok';apx[k].okAt=Date.now();pt0[k]=apx[k];}});render();
+    hvReq(HV_PATH+'/apps/'+x,'PATCH',pt0).then(function(){showToast(Object.keys(pt0).length+'명을 승인했어요','success');}).catch(function(er){showToast('저장 실패 ('+er.message+')','cancel');hvLoad(true);});return;}
   if(a==='snew'){hvEditStart(null);return;}
   if(a==='sedit'){hvEditStart(x);return;}
   if(a==='spreset'){hvEditStart(null,x);showToast('33권과 질문을 채웠어요 — 날짜 확인 후 저장해 주세요','info');return;}
   if(a==='sup'||a==='sdn'){hvMoveSeries(x,a==='sup'?-1:1);return;}
-  if(a==='eback'){if(confirm('저장하지 않은 변경은 사라져요. 나갈까요?')){S.hvEdit=null;st.v='admin';render();}return;}
-  if(!c)return;
+  }
+  if(!c||!(adm||(m&&c.owner===m.id)))return;
+  if(a==='eback'){if(confirm('저장하지 않은 변경은 사라져요. 나갈까요?')){var bk0=c.owner?'shelf':'admin';S.hvEdit=null;st.v=bk0;render();}return;}
+  if(a==='eqreset'){c.qsDefText=HV_GENERIC.join('\n');render();return;}
   if(a==='etier'){c.tiers=c.tiers||[];var ti=c.tiers.indexOf(x);if(ti>=0)c.tiers.splice(ti,1);else c.tiers.push(x);render();return;}
   if(a==='ewb'){c.wb=!c.wb;render();return;}
   if(a==='eact'){c.active=c.active===false;render();return;}
@@ -5806,8 +5960,8 @@ document.addEventListener('click',function(e){
     showToast(nu+'권을 바꿨어요 — 저장을 눌러야 반영돼요','info');render();return;
   }
   if(a==='sdel'){
-    if(!confirm('「'+c.name+'」 일정을 삭제할까요?\n(멤버들이 쓴 일지는 지워지지 않고 남아요)'))return;
-    hvReq(HV_PATH+'/series/'+c.id,'DELETE').then(function(){delete HV.series[c.id];S.hvEdit=null;st.v='admin';showToast('삭제했어요','cancel');render();})
+    if(!confirm('「'+c.name+'」'+(c.owner?' 책장':' 일정')+'을 삭제할까요?\n(쓴 일지는 지워지지 않고 남아요)'))return;
+    hvReq(HV_PATH+'/series/'+c.id,'DELETE').then(function(){delete HV.series[c.id];var bk1=c.owner?'shelf':'admin';S.hvEdit=null;st.v=bk1;showToast('삭제했어요','cancel');render();})
       .catch(function(er){showToast('삭제 실패 ('+er.message+')','cancel');});
     return;
   }
@@ -5822,6 +5976,7 @@ document.addEventListener('input',function(e){
     if(p.length===1)o[p[0]]=t.value;
     else{o[p[0]]=o[p[0]]||{};var cur=o[p[0]];for(var i=1;i<p.length-1;i++){cur[p[i]]=cur[p[i]]||{};cur=cur[p[i]];}cur[p[p.length-1]]=t.value;}
     if(p[0]==='essay'){o.essayEd=o.essayEd||{};o.essayEd[p[1]]=true;}
+    if(p[0]==='hero'&&S.hvHeroErr&&t.value.trim()){S.hvHeroErr=false;var rq=t.closest('.hv-req');if(rq)rq.classList.remove('err');}
     clearTimeout(hvDraftStash._t);hvDraftStash._t=setTimeout(hvDraftStash,600);
     return;
   }
@@ -5849,6 +6004,7 @@ document.addEventListener('change',function(e){
 });
 // 아이 이름 입력칸에서 엔터 = 추가
 document.addEventListener('keydown',function(e){
+  if(S.tab==='hav'&&e.key==='Enter'&&e.target&&/^hv-pb-/.test(e.target.id||'')){e.preventDefault();var qb=document.querySelector('[data-hv="pquick"][data-x="'+e.target.id.slice(6)+'"]');if(qb)qb.click();return;}
   if(S.tab==='hav'&&e.key==='Enter'&&e.target&&e.target.id==='hv-kid-in'){e.preventDefault();var b=document.querySelector('[data-hv="kidadd"]');if(b)b.click();}
 });
 
