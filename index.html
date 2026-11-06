@@ -587,6 +587,23 @@ body.hv-mode #app{background:#FBF8F3}
 }
 .hq-meta{display:flex;justify-content:space-between;gap:8px;align-items:baseline;flex-wrap:wrap}
 .hq-tip{font-size:10.5px;color:#9A8B76}
+/* 고르기 · 브랜드 */
+.hv-bx{width:20px;height:20px;flex-shrink:0;border:1.5px solid var(--br);background:var(--wh);color:#fff;font-size:12px;font-weight:800;display:inline-flex;align-items:center;justify-content:center}
+.hv-bx.on{background:var(--pr);border-color:var(--pr)}
+.hv-bsel{border:1px solid var(--br);margin-top:4px}
+.hv-bsel .hv-pk-i.on{background:var(--wh);color:var(--tx)}
+.hv-bsel .hv-pk-i:not(.on){color:#A3A3A3}
+.hv-bsel-h{font-size:12px;font-weight:800;color:var(--mu);background:var(--bgd);padding:6px 12px}
+.hb-brand{color:#B4561C;font-weight:800;letter-spacing:.01em}
+.hb-br{float:right;font-size:10.5px;font-weight:800;color:#B4561C;letter-spacing:.01em}
+.hb-h2 .hb-br{font-size:11px;margin-top:6px}
+.hq-pick{width:100%;max-width:520px;max-height:40vh;overflow-y:auto;background:#fff;color:#333;text-align:left}
+.hq-pick-t{display:flex;gap:6px;align-items:center;padding:8px 10px;border-bottom:1px solid #ddd;position:sticky;top:0;background:#fff}
+.hq-pick-t b{flex:1;font-size:13px}
+.hq-pick-t button{border:1px solid #ccc;background:#fff;font-size:12px;padding:.3rem .6rem;cursor:pointer;color:#333}
+.hq-pi{display:flex;align-items:center;gap:8px;width:100%;border:none;border-bottom:1px solid #eee;background:#fff;padding:8px 10px;font-size:13.5px;text-align:left;cursor:pointer;color:#333}
+.hq-pi small{color:#9CA3AF;font-size:11px}
+.hq-pi.w:not(.on){color:#A3A3A3}
 </style>
 </head>
 <body>
@@ -4977,6 +4994,7 @@ var HV_PRESETS={lili:{"key": "lili", "name": "리리의 이야기 숲 하브루�
 // ══════════════════════════════════════════════
 // 사이트 이름: 여기만 바꾸면 헤더·하단 메뉴에 모두 반영돼요
 var HV_NAME='하브루타 독후일지',HV_SHORT='독후일지';
+var HV_BRAND='@kkang_twins_ 강둥맘';
 var HV_PATH=DB_PATH.replace('.json','_hav');
 var HV_IMG=DB_PATH.replace('.json','_havimg');
 var HV={loaded:false,loading:false,err:'',series:{},entries:{},reads:{},kids:{},apps:{},cmts:{},imgs:{},imgLoading:{}};
@@ -5361,7 +5379,7 @@ function rHvEntry(e,mode){
     if(e.pub)h+=rHvRx(e);
     if(e.pub||hvCmts(e.id).length)h+=rHvCmts(e);
     h+='<div class="hv-act">';
-    if(mineE)h+='<button class="hv-sb" data-hv="edit" data-x="'+e.id+'">✏️ 수정</button><button class="hv-sb del" data-hv="edel" data-x="'+e.id+'">삭제</button>';
+    if(mineE)h+='<button class="hv-sb" data-hv="epdf" data-x="'+e.id+'">📕 PDF</button><button class="hv-sb" data-hv="edit" data-x="'+e.id+'">✏️ 수정</button><button class="hv-sb del" data-hv="edel" data-x="'+e.id+'">삭제</button>';
     else if(adm&&mode==='feed')h+='<button class="hv-sb del" data-hv="edel" data-x="'+e.id+'">🛡️ 관리자 삭제</button>';
     h+='</div></div>';
   }
@@ -5833,34 +5851,54 @@ function hvMyEntries(sid){
   var m=hvMe();if(!m)return [];
   return Object.keys(HV.entries).map(function(k){return HV.entries[k];}).filter(function(e){return e&&e.mid===m.id&&(!sid||e.sid===sid);});
 }
+function hvBookScope(b){
+  var all=hvMyEntries(b.sid==='*'?null:b.sid).filter(function(e){return b.priv||e.pub;});
+  var so={};hvSeriesList().forEach(function(x,i){so[x.id]=i;});
+  var bo=function(e){var sx=HV.series[e.sid];if(!sx)return 999;var i=hvBooks(sx).map(function(y){return y.id;}).indexOf(e.bid);return i<0?999:i;};
+  return all.sort(function(x,y){return ((so[x.sid]!==undefined?so[x.sid]:99)-(so[y.sid]!==undefined?so[y.sid]:99))||(bo(x)-bo(y))||((x.date||'')<(y.date||'')?-1:1);});
+}
 function rHvBookSetup(){
-  var m=hvMe(),b=S.hvBook||(S.hvBook={sid:'',img:true,priv:true,title:'',kids:'',es:true,qa:true});
-  if(!m)return '';
+  var m=hvMe(),b=S.hvBook||(S.hvBook={sid:'',img:true,priv:true,title:'',kids:'',es:true,qa:true,off:{}});
+  if(!m)return '';b.off=b.off||{};
   var ss=hvSeriesList().filter(function(s){return hvMyEntries(s.id).length;});
-  if(!b.sid&&ss.length)b.sid=ss[0].id;
-  var s=HV.series[b.sid];
-  if(!b.title&&s)b.title=s.name.replace(/\s*하브루타$/,'')+' 하브루타 일지';
+  if(!b.sid&&ss.length)b.sid=ss.length>1?'*':ss[0].id;
+  var s=b.sid==='*'?null:HV.series[b.sid];
+  if(!b.title)b.title=s?s.name.replace(/\s*하브루타$/,'')+' 하브루타 일지':'우리 아이 하브루타 독후일지';
   if(!b.kids)b.kids=hvKids(m.id).map(function(k){return k.name;}).join(' · ');
-  var n=hvMyEntries(b.sid).filter(function(e){return b.priv||e.pub;}).length;
+  var scope=hvBookScope(b),n=scope.filter(function(e){return !b.off[e.id];}).length;
   var h='<button class="hv-back" data-hv="v" data-x="mine">‹ 내 일지로</button>';
   if(!ss.length)return h+'<div class="card empty">아직 쓴 일지가 없어요. 일지를 쓰면 책으로 묶을 수 있어요.</div>';
-  h+='<div class="hv-fm"><div class="hv-fc"><div class="hv-fl">어떤 전집으로 만들까요?</div><select class="hv-sel" data-hvsel="bsid">'+ss.map(function(x){return '<option value="'+x.id+'"'+(x.id===b.sid?' selected':'')+'>'+esc(x.name)+' ('+hvMyEntries(x.id).length+'권)</option>';}).join('')+'</select></div>';
+  h+='<div class="hv-fm"><div class="hv-fc"><div class="hv-fl">어떤 일지로 만들까요?</div><select class="hv-sel" data-hvsel="bsid">'+
+    (ss.length>1?'<option value="*"'+(b.sid==='*'?' selected':'')+'>📚 전체 (모든 스터디·책장)</option>':'')+
+    ss.map(function(x){return '<option value="'+x.id+'"'+(x.id===b.sid?' selected':'')+'>'+(x.owner?'📔 ':'')+esc(x.name)+' ('+hvMyEntries(x.id).length+'권)</option>';}).join('')+'</select></div>';
   h+='<div class="hv-fc"><div class="hv-fl">책 제목</div><input class="hv-in" data-hvb="title" value="'+esc(b.title)+'">'+
     '<div class="hv-fl" style="margin-top:10px;">표지에 넣을 이름</div><input class="hv-in" data-hvb="kids" value="'+esc(b.kids)+'" placeholder="예: 강이 · 둥이"></div>';
   h+='<div class="hv-fc"><div class="hv-fl">담을 내용</div><div class="hv-chips">'+
     '<button class="hv-chip'+(b.img?' on':'')+'" data-hv="bimg">'+(b.img?'✓ ':'')+'사진 넣기</button>'+
     '<button class="hv-chip'+(b.es!==false?' on':'')+'" data-hv="bes">'+(b.es!==false?'✓ ':'')+'독서감상문</button>'+
     '<button class="hv-chip'+(b.qa!==false?' on':'')+'" data-hv="bqa">'+(b.qa!==false?'✓ ':'')+'질문·대답 기록</button>'+
-    '<button class="hv-chip'+(b.priv?' on':'')+'" data-hv="bpriv">'+(b.priv?'✓ ':'')+'나만 보기 일지도 넣기</button></div>'+
-    '<div class="hv-fh" style="margin:8px 0 0;">'+n+'권의 일지가 책 순서대로 담겨요.</div></div>';
-  h+='<button class="abtn hv-save" data-hv="bmake"'+(S.hvBookBusy||!n?' disabled':'')+'>'+(S.hvBookBusy?'사진 불러오는 중… '+S.hvBookBusy:'📕 책 미리보기')+'</button>';
-  h+='<div class="hv-stat" style="line-height:1.6;padding:0 2px;">미리보기에서 <b>PDF로 저장</b>을 누르면 인쇄 창이 열려요.<br>· PC: 대상에서 \'PDF로 저장\'을 고르세요<br>· 아이폰: 인쇄 옵션 → 공유 → \'파일에 저장\'<br>· 안드로이드: 프린터 선택 → \'PDF로 저장\'</div></div>';
+    '<button class="hv-chip'+(b.priv?' on':'')+'" data-hv="bpriv">'+(b.priv?'✓ ':'')+'나만 보기 일지도 넣기</button></div></div>';
+  // 일지 골라 담기
+  h+='<div class="hv-fc"><div class="hv-fl">✅ 담을 일지 고르기 <span class="hv-stat">('+n+'/'+scope.length+'권 선택)</span></div>'+
+    '<div style="display:flex;gap:6px;margin-bottom:4px;"><button class="hv-sb" data-hv="bselall">전체 선택</button><button class="hv-sb" data-hv="bselnone">전체 해제</button></div><div class="hv-pk-list hv-bsel">';
+  var lastS='';
+  scope.forEach(function(e){
+    if(b.sid==='*'&&e.sid!==lastS){lastS=e.sid;var sx=HV.series[e.sid];h+='<div class="hv-bsel-h">'+(sx&&sx.owner?'📔 ':'📚 ')+esc((sx&&sx.name)||e.sname||'')+'</div>';}
+    var on=!b.off[e.id];
+    h+='<button class="hv-pk-i'+(on?' on':'')+'" data-hv="bsel" data-x="'+e.id+'"><span class="hv-bx'+(on?' on':'')+'">'+(on?'✓':'')+'</span><span class="hv-pk-t">'+esc(e.btitle)+'</span><span class="hv-pk-s">'+hvFmt(e.date)+(e.pub?'':' · 🔒')+'</span></button>';
+  });
+  h+='</div></div>';
+  h+='<button class="abtn hv-save" data-hv="bmake"'+(S.hvBookBusy||!n?' disabled':'')+'>'+(S.hvBookBusy?'사진 불러오는 중… '+S.hvBookBusy:'📕 '+n+'권으로 책 미리보기')+'</button>';
+  h+='<div class="hv-stat" style="line-height:1.6;padding:0 2px;">미리보기에서 <b>PDF로 저장</b>을 누르면 인쇄 창이 열려요. 고른 일지가 <b>파일 하나</b>로 저장돼요.<br>· PC: 대상에서 \'PDF로 저장\'을 고르세요<br>· 아이폰: 인쇄 옵션 → 공유 → \'파일에 저장\'<br>· 안드로이드: 프린터 선택 → \'PDF로 저장\'</div></div>';
   return h;
 }
 async function hvMakeBook(){
   var b=S.hvBook,m=hvMe();if(!b||!m)return;
-  var s=HV.series[b.sid];var order={};(s?hvBooks(s):[]).forEach(function(x,i){order[x.id]=i;});
-  var list=hvMyEntries(b.sid).filter(function(e){return b.priv||e.pub;}).sort(function(x,y){return (order[x.bid]!==undefined?order[x.bid]:999)-(order[y.bid]!==undefined?order[y.bid]:999)||(x.date<y.date?-1:1);});
+  var s=b.sid==='*'?null:HV.series[b.sid];var order={};
+  hvSeriesList().forEach(function(sx){hvBooks(sx).forEach(function(x,i){order[x.id]=i;});});
+  var list=b.only?b.only.map(function(id){return HV.entries[id];}).filter(Boolean):hvBookScope(b).filter(function(e){return !(b.off||{})[e.id];});
+  if(!list.length){showToast('담을 일지를 골라 주세요','info');return;}
+  if(b.only&&!b.title)b.title=list[0].btitle+' 독후일지';
   if(b.img){
     var need=list.filter(function(e){return e.nimg&&!HV.imgs[e.id];});
     for(var i=0;i<need.length;i++){
@@ -5875,13 +5913,14 @@ async function hvMakeBook(){
   h+='<section class="hb-page hb-cover"><div class="hb-frame"><div class="hb-leaf">🌿</div><div class="hb-ct">'+esc(b.title)+'</div>'+
     (s?'<div class="hb-cs">'+esc(s.name)+'</div>':'')+'<div class="hb-ck">'+esc(b.kids)+'</div>'+
     '<div class="hb-cd">'+(dates.length?fmtD(dates[0])+' ~ '+fmtD(dates[dates.length-1]):'')+'<br>'+list.length+'권의 대화 기록</div>'+
-    '<div class="hb-cf">하브루타 독후일지 · 강둥이네와 함께<br>written by '+esc(shortName(m))+'</div></div></section>';
-  h+='<section class="hb-page"><div class="hb-h2">차례</div><ol class="hb-toc">'+list.map(function(e){
+    '<div class="hb-cf"><b class="hb-brand">🍀 '+HV_BRAND+'</b><br>하브루타 독후일지 · written by '+esc(shortName(m))+'</div></div></section>';
+  if(list.length>1)h+='<section class="hb-page"><div class="hb-h2">차례<span class="hb-br">🍀 '+HV_BRAND+'</span></div><ol class="hb-toc">'+list.map(function(e){
     return '<li><span class="hb-tn">'+(order[e.bid]!==undefined?order[e.bid]+1:'·')+'</span><span class="hb-tt">'+esc(e.btitle)+'</span><span class="hb-td">'+fmtD(e.date)+'</span></li>';}).join('')+'</ol></section>';
   list.forEach(function(e){
-    var bk=s&&hvFindBook(e.sid,e.bid);
+    var bk=hvFindBook(e.sid,e.bid);
     var kids=e.kids?hvKOrder(Object.keys(e.kids)).filter(function(k){return k!=='all';}).map(function(k){return e.kids[k];}):[];
-    h+='<section class="hb-page hb-entry"><div class="hb-no">No. '+(order[e.bid]!==undefined?('0'+(order[e.bid]+1)).slice(-2):'·')+(bk&&bk.tag?' · '+esc(bk.tag):'')+'</div>'+
+    var sxe=HV.series[e.sid];
+    h+='<section class="hb-page hb-entry"><div class="hb-no">'+(b.sid==='*'&&sxe?esc(sxe.name)+' · ':'')+'No. '+(order[e.bid]!==undefined?('0'+(order[e.bid]+1)).slice(-2):'·')+(bk&&bk.tag?' · '+esc(bk.tag):'')+'<span class="hb-br">🍀 '+HV_BRAND+'</span></div>'+
       '<div class="hb-et">'+esc(e.btitle)+'</div><div class="hb-em">'+fmtD(e.date)+(kids.length?' · 함께한 아이: '+esc(kids.join(', ')):'')+(e.wb?' · 워크북 ✓':'')+'</div>';
     if(b.es!==false)hvEssayKids(e).forEach(function(k){var t=hvEssayOf(e,k);if(!t)return;
       h+='<div class="hb-essay"><div class="hb-esh">「'+esc(e.btitle||'')+'」'+hvEul(e.btitle)+' 읽고 <span>— '+esc(hvKName(e,k))+'</span></div>'+t.split(/\n\s*\n/).map(function(p){return '<p>'+esc(p)+'</p>';}).join('')+'</div>';});
@@ -5919,13 +5958,16 @@ function hvRenderQSheet(){
   if(o.rng==='one')list=all.filter(function(b){return o.bids.indexOf(b.id)>=0;});
   else if(o.rng==='next'){var st0=m?hvNext(s,m.id):null;var i0=st0?st0.i:0;list=all.slice(i0,i0+3);}
   else if(o.rng==='left')list=all.filter(function(b){return !(m&&hvMyEntry(b.id,m.id));});
+  else if(o.rng==='pick')list=all.filter(function(b){return (o.pick||{})[b.id];});
   else list=all;
   list=list.filter(function(b){return hvBookQs(s,b).length;});
   var kids=m?hvKids(m.id).map(function(k){return k.name;}):[];
   var chip=function(k,label,on){return '<button class="hq-opt'+(on?' on':'')+'" data-hv="qsopt" data-x="'+k+'">'+(on?'✓ ':'')+label+'</button>';};
   var h='<div class="hb-bar hq-bar"><div class="hq-row"><button data-hv="bprint" class="hb-pr">🖨️ 인쇄 · PDF 저장</button><button data-hv="bclose">닫기</button></div><div class="hq-row">'+
-    (o.rng!=='one'?chip('r_next','다음 3권',o.rng==='next')+chip('r_left','안 쓴 책 전부',o.rng==='left')+chip('r_all','전체 '+all.length+'권',o.rng==='all'):'')+
-    chip('guide','부모 가이드',o.guide)+chip('l0','답 칸 없음',!o.lines)+chip('l1','답 칸 1줄 (한 장)',o.lines===1)+chip('l2','답 칸 2줄',o.lines===2)+'</div></div><div class="hb-pages">';
+    (o.rng!=='one'?chip('r_next','다음 3권',o.rng==='next')+chip('r_left','안 쓴 책 전부',o.rng==='left')+chip('r_all','전체 '+all.length+'권',o.rng==='all')+chip('r_pick','✅ 직접 고르기',o.rng==='pick'):'')+
+    '</div>'+(o.rng==='pick'?'<div class="hq-pick"><div class="hq-pick-t"><b>'+Object.keys(o.pick||{}).filter(function(k){return o.pick[k];}).length+'권 선택</b><button data-hv="qspall">전체 선택</button><button data-hv="qspnone">전체 해제</button></div>'+
+      all.map(function(b,i){var on=(o.pick||{})[b.id],w=m&&hvMyEntry(b.id,m.id);return '<button class="hq-pi'+(on?' on':'')+(w?' w':'')+'" data-hv="qspick" data-x="'+b.id+'"><span class="hv-bx'+(on?' on':'')+'">'+(on?'✓':'')+'</span>'+(i+1)+'. '+esc(b.title)+(w?' <small>작성함</small>':'')+'</button>';}).join('')+'</div>':'')+
+    '<div class="hq-row">'+chip('guide','부모 가이드',o.guide)+chip('l0','답 칸 없음',!o.lines)+chip('l1','답 칸 1줄 (한 장)',o.lines===1)+chip('l2','답 칸 2줄',o.lines===2)+'</div></div><div class="hb-pages">';
   if(!list.length)h+='<section class="hb-page"><div class="hb-em" style="border:none;">인쇄할 질문이 없어요.</div></section>';
   list.forEach(function(b){
     var qs=hvBookQs(s,b),hero=b.hero||'';
@@ -5935,7 +5977,7 @@ function hvRenderQSheet(){
     qs.forEach(function(q,qi){groups[hasStage?hvStage(q):2].push({q:fix(q),n:qi+1});});
     h+='<section class="hb-page hq"><div class="hq-top"><div><div class="hb-no">'+esc(s.name)+' · No. '+('0'+(order[b.id]+1)).slice(-2)+(b.tag?' · '+esc(b.tag):'')+'</div>'+
       '<div class="hb-et">'+esc(b.title)+'</div></div><div class="hq-fill">날짜 <span></span><br>'+(kids.length?esc(kids.join(' · ')):'아이')+' <span></span></div></div>'+
-      '<div class="hq-meta"><span>🦸 주인공: '+(hero?'<b>'+esc(hero)+'</b>':'<span class="hq-blank"></span>')+'</span><span class="hq-tip">대화 후 독후일지에 옮겨 적어 주세요 · 강둥이네와 함께</span></div>';
+      '<div class="hq-meta"><span>🦸 주인공: '+(hero?'<b>'+esc(hero)+'</b>':'<span class="hq-blank"></span>')+'</span><span class="hq-tip">대화 후 독후일지에 옮겨 적어 주세요 · <b class="hb-brand">🍀 '+HV_BRAND+'</b></span></div>';
     if(o.guide&&b.guide)h+='<div class="hq-guide">'+hvGuideHtml(b.guide)+'</div>';
     [1,2,3,0].forEach(function(st){
       if(!groups[st].length)return;
@@ -6072,12 +6114,20 @@ document.addEventListener('click',function(e){
   if(a==='bes'){S.hvBook.es=S.hvBook.es===false;if(S.hvBook.es===false&&S.hvBook.qa===false)S.hvBook.qa=true;render();return;}
   if(a==='bqa'){S.hvBook.qa=S.hvBook.qa===false;if(S.hvBook.es===false&&S.hvBook.qa===false)S.hvBook.es=true;render();return;}
   if(a==='bpriv'){S.hvBook.priv=!S.hvBook.priv;render();return;}
-  if(a==='bmake'){hvMakeBook();return;}
+  if(a==='bmake'){S.hvBook.only=null;hvMakeBook();return;}
+  if(a==='bsel'){var bo=S.hvBook;bo.off=bo.off||{};bo.off[x]=!bo.off[x];render();return;}
+  if(a==='bselall'){S.hvBook.off={};render();return;}
+  if(a==='bselnone'){var bo2=S.hvBook,off={};hvBookScope(bo2).forEach(function(e){off[e.id]=true;});bo2.off=off;render();return;}
+  if(a==='epdf'){var en2=HV.entries[x];if(!en2)return;var kn=hvKids(m.id).map(function(k){return k.name;}).join(' · ');
+    S.hvBook={sid:en2.sid,img:true,priv:true,title:en2.btitle+' 독후일지',kids:kn,es:true,qa:true,off:{},only:[x]};hvMakeBook();return;}
   if(a==='bprint'){window.print();return;}
   if(a==='bclose'){hvCloseBook();return;}
   if(a==='qprint'){hvOpenQSheet(x,[y]);return;}
+  if(a==='qspick'&&S.hvQS){var pk=S.hvQS.pick=S.hvQS.pick||{};pk[x]=!pk[x];hvRenderQSheet();return;}
+  if(a==='qspall'&&S.hvQS){var pk2={};hvBooks(HV.series[S.hvQS.sid]).forEach(function(b){pk2[b.id]=true;});S.hvQS.pick=pk2;hvRenderQSheet();return;}
+  if(a==='qspnone'&&S.hvQS){S.hvQS.pick={};hvRenderQSheet();return;}
   if(a==='qprintall'){hvOpenQSheet(x,null);return;}
-  if(a==='qsopt'&&S.hvQS){var q0=S.hvQS;if(x==='guide')q0.guide=!q0.guide;else if(/^l\d$/.test(x))q0.lines=+x.slice(1);else q0.rng=x.slice(2);hvRenderQSheet();return;}
+  if(a==='qsopt'&&S.hvQS){var q0=S.hvQS;if(x==='guide')q0.guide=!q0.guide;else if(/^l\d$/.test(x))q0.lines=+x.slice(1);else{q0.rng=x.slice(2);if(q0.rng==='pick'&&!q0.pick){q0.pick={};var nx0=m?hvNext(HV.series[q0.sid],m.id):null;if(nx0)q0.pick[nx0.b.id]=true;}}hvRenderQSheet();return;}
   if(a==='flush'){hvFlush();showToast('다시 저장하는 중…','info');return;}
   if(a==='pick'){S.hvPick=!S.hvPick;render();return;}
   if(a==='essay'){S.hvEssayOpen=true;render();return;}
@@ -6178,7 +6228,7 @@ document.addEventListener('change',function(e){
   if(S.tab!=='hav')return;
   var t=e.target;
   if(t.getAttribute&&t.getAttribute('data-hvsel')==='ff'){hvSt().ff=t.value;render();return;}
-  if(t.getAttribute&&t.getAttribute('data-hvsel')==='bsid'){S.hvBook.sid=t.value;S.hvBook.title='';render();return;}
+  if(t.getAttribute&&t.getAttribute('data-hvsel')==='bsid'){S.hvBook.sid=t.value;S.hvBook.title='';S.hvBook.off={};render();return;}
   if(t.id==='hv-file'&&S.hvDraft&&S.hvDraft.imgs){
     var d=S.hvDraft,files=Array.prototype.slice.call(t.files||[],0,3-d.imgs.length);
     if(!files.length)return;
